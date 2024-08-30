@@ -1,3 +1,9 @@
+//  CITS2002 Project 1 2024
+//  Student1:   23630652    Zac Doruk Maslen
+//  Student2:   20000000    Alexandra Mennie
+//  Platform:   Ubuntu Linux
+
+
 /*
 ## THE ML LANGUAGE
 
@@ -41,6 +47,8 @@ to that function, and become unavailable when the function's execution completes
 
 */
 
+// going to include a personal header that contains commonly used commands
+#include "file_utilities.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,34 +59,6 @@ to that function, and become unavailable when the function's execution completes
 #include <sys/stat.h>
 #include <fcntl.h>
 
-// Global Variable Definitions
-#define MY_SIZE 100000
-
-// function to read contents of a .ml file
-int readFile(char *filename) {
-
-    FILE *file = fopen(filename, "r");
-    // error checking: file does not exist
-    if (file == NULL) {
-        printf("Error: Could not open file %s\n", filename);
-        return -1;
-
-
-    // array string needs to be large enough to hold file
-    char contents[MY_SIZE];
-    while (fgets(contents, MY_SIZE, file) != NULL) {
-        printf("%s", contents);
-    } 
-    
-
-    if (ferror(file)) {
-        printf("Error: Could not read file %s\n", filename);
-        fclose(file);
-        return -1;
-    }
-    fclose(file);
-    return 0;
-}
 
 int main(int argc, char *argv[]) {
     // error checking, if no. of args is less than 2 
@@ -87,8 +67,16 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // the name of the file is at initial argument provided
     char *filename = argv[1];
 
+    // checks if file name is .ml
+    if (strstr(filename, ".ml") == NULL) {
+        printf("Error: Invalid file extension. File must be a .ml file.\n");
+        return 1;
+    }
+
+    // read the file
     int status = readFile(filename);
 
     if (status == -1) {
@@ -96,8 +84,3 @@ int main(int argc, char *argv[]) {
     }
     return 0;
 }
-
-
-
-    
-
