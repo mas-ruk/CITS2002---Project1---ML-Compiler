@@ -63,7 +63,7 @@ to that function, and become unavailable when the function's execution completes
 int main(int argc, char *argv[]) {
     // error checking, if no. of args is less than 2 
     if (argc < 2) {
-        printf("Usage: %s <filename.ml>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <filename.ml>\n", argv[0]); // changed to fprintf to print to stderr instead of default data stream
         return 1;
     }
 
@@ -71,10 +71,13 @@ int main(int argc, char *argv[]) {
     char *filename = argv[1];
 
     // checks if file name is .ml
-    if (strstr(filename, ".ml") == NULL) {
-        printf("Error: Invalid file extension. File must be a .ml file.\n");
+    size_t length = strlen(filename); // unsigned datatype, good for storing str length 
+    if (length < 3 || strcmp(filename + length - 3, ".ml") != 0) {
+        fprintf(stderr, "Error: File name must end with '.ml'\n");
         return 1;
     }
+
+
 
     // read the file
     int status = readFile(filename);
