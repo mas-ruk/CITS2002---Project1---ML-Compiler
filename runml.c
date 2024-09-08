@@ -1,6 +1,6 @@
 //  CITS2002 Project 1 2024
 //  Student1:   23630652    Zac Doruk Maslen
-//  Student2:   20000000    Alexandra Mennie
+//  Student2:   24000895    Alexandra Mennie
 //  Platform:   Ubuntu Linux
 
 #include <stdio.h>
