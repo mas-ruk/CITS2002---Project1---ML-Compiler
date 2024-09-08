@@ -114,21 +114,32 @@ int lineCount(FILE *file) {
 
 // function to read contents of a .ml file
 int readFile(char *filename) {
+
+    // opening file for reading
     FILE *file = fopen(filename, "r");
+    
     // error checking: file does not exist
     if (file == NULL) {
-        printf("Error: Could not open file %s\n", filename);
+        fprintf(stderr, "Error: Could not open file %s\n", filename);
         return -1;
     }
 
-    // array string needs to be large enough to hold file
-    char contents[MY_SIZE];
-
-    // TEMPORARY -- prints the contents of the file
-    while (fgets(contents, MY_SIZE, file) != NULL) {
-        printf("%s", contents);
-    } 
+    // buffer holds each line
+    char line[MY_SIZE]; 
     
+    // file reading logic
+    while (fgets(line, sizeof(line), file) != NULL) {
+        // remove new line char 
+        size_t len = strlen(line);
+        if (len > 0 && line[len - 1] == '\n') {
+            line[len - 1] = '\0';
+        }
+
+        // tokenize
+        tokenize(line);
+    }
+
+    // error checking: file is empty
     if (ferror(file)) {
         printf("Error: Could not read file %s\n", filename);
         fclose(file);
@@ -178,7 +189,7 @@ void tokenize(const char *code) {
             }
 
         // Check for numbers (real constant values)
-         else if (isdigit(*p)) { // Integer Number or Float (aka. realconstant)
+         else if (isdigit(*pointer)) { // Integer Number or Float (aka. realconstant)
             char TempBuffer[100] = {0};
             int i = 0; 
             while (isdigit(*pointer)) TempBuffer[i++] = *p++; //increment through all digits to extract digit until space
@@ -232,4 +243,22 @@ void tokenize(const char *code) {
         }
     }
     addToken(TknEnd, "ENDPROGRAM"); // End of input
+}
+
+// defining translation to C function
+void toC(FILE *cFile) {
+
+}
+
+void compileForC() {
+
+}
+
+void runInC() {
+
+}
+
+// function to remove created C file and exec file
+void cleanupAfterExec() {
+
 }
