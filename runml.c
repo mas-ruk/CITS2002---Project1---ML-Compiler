@@ -31,6 +31,7 @@ typedef enum {
     TknTermOperator, // "+" or "-"
     TknFactorOperator, // "*" or "/"
     TknBracket, // "(" or ")"
+    TknComma // ","
     TknEnd // "END" 
 } TknType;
 
@@ -245,22 +246,25 @@ void tokenize(const char *code) {
             }             
 
         // check for mathematical operators
-        else if (*pointer == '+' || *pointer == '-' || *pointer == '*' || *pointer == '/' || *pointer == '(' || *pointer == ')') { // if valid character
+        else if (*pointer == '+' || *pointer == '-' || *pointer == '*' || *pointer == '/' || *pointer == '(' || *pointer == ')'|| *pointer == ',') { // if valid character
             char TempBuffer[2] = {*pointer, '\0'};
             TknType TknType;
                 switch (*pointer) {
-                  case '+':
-                  case '-':
-                    TknType = TknTermOperator;  // if '+' and '-' (term operators) exists
-                    break;
-                  case '*':
-                  case '/':
-                    TknType = TknFactorOperator;  // if '*' and '/' (factor operators) exists
-                    break;
-                  case '(':
-                  case ')':
-                    TknType = TknBracket;  // if '(' and ')' (brackets) exists
-                    break;
+                    case '+':
+                    case '-':
+                        TknType = TknTermOperator;  // if '+' and '-' (term operators) exists
+                        break;
+                    case '*':
+                    case '/':
+                        TknType = TknFactorOperator;  // if '*' and '/' (factor operators) exists
+                        break;
+                    case '(':
+                    case ')':
+                        TknType = TknBracket;  // if '(' and ')' (brackets) exists
+                        break;
+                    case ')':
+                        TknType = TknComma;  // if ',' (comma) exists
+                        break;
         } 
 
         // check for assignment operator
