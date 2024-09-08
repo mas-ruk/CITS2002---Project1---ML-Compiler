@@ -1,0 +1,76 @@
+Possible code pathways! aka. psuedocode for parser
+
+1. Function 
+=> TknFunction TknIdentifier 
+… void function
+… check concurrent lines with ’TAB1’ indent, these are our function statements
+… if no concurrent lines with ‘TAB1’ indent, then flag error for empty function or improperly formatted function
+… branch to ‘statement’ 
+
+=> TknFunction TknIdentifier <insert number of identifiers here> (could call many identifiers as part of function)
+… check concurrent lines with ’TAB1’ indent, these are our function statements
+… if no concurrent lines with ‘TAB1’ indent, then flag error for empty function or improperly formatted function
+… branch to ‘statement’ 
+
+2. Statement 
+2.1 Assignment
+=> TknIdentifier TknAssignmentOperator <insert expression here>
+… branch to ‘expressions’
+
+3. Expression
+=> TknIdentifier
+… find if identifier variable already exists, if it does then use this
+… if identifier variable doesn’t exist yet, automatically initialise to 0.0
+
+=> TknNumber/TknFloat
+… can proceed with ease
+
+=> <insert term here> TknTermOperator TknIdentifier/TknNumber/TknFloat
+… branch to ‘term’
+
+4. Term
+=> TknIdentifier
+… find if identifier variable already exists, if it does then use this
+… if identifier variable doesn’t exist yet, automatically initialise to 0.0
+
+=>TknNumber/TknFloat
+… can proceed with ease
+
+=> <insert factor here> TknFactorOperator TknIdentifier/TknNumber/TknFloat
+… branch to factor
+
+5. Factor
+=> TknIdentifier
+… find if identifier variable already exists, if it does then use this
+… if identifier variable doesn’t exist yet, automatically initialise to 0.0
+
+=>TknNumber/TknFloat
+… can proceed with ease
+
+=> TknBracket <insert expression here> TknBracket
+… branch to expression 
+
+=> TknIdentifier TknBracket <insert number of different tokens here> TknBracket
+… branch to functioncall
+
+2.2 Print
+=> TknPrint <insert expression here>
+… branch to expression
+
+2.3 Return
+=>TknReturn <insert expression here>
+… branch to expression
+
+2.4 Functioncall
+=> TknIdentifier TknBracket TknBracket
+… function without input called
+… void function
+
+=> TknIdentifier TknBracket <insert expression here> TknBracket
+… call function
+
+=> TknIdentifier TknBracket <insert expression here> TknComma <insertexpressionhere> ….. (may have more TknComma <insert expression here>) …. TknBracket
+… call function 
+
+
+
