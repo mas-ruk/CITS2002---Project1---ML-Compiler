@@ -194,20 +194,24 @@ void tokenize(const char *code) {
             
             while (isdigit(*pointer)) { // increment and extract digits before decimal point
                  TempBuffer[i++] = *pointer++; // 
-             }
+            }
+
             if (*pointer == '.') { // handle floats
-                if (HasDecimalPoint) { // check for if multiple decimal points exist
+                if (hasDecimalPoint) { // check for if multiple decimal points exist
                     fprintf(stderr, "! Syntax Error: Multiple decimal points in number.\n Recommendation: Check all numbers for incorrect format.\n");
                     exit(1);
                 }
+
                 hasDecimalPoint = true;
-                TempBuffer[i++] = *pointer++; 
-                    while (isdigit(*pointer)) { // increment and extract digits after decimal point
-                        TempBuffer[i++] = *pointer++;
-                    }
+                TempBuffer[i++] = *pointer++; // decimal point added 
+
+                while (isdigit(*pointer)) { // increment and extract digits after decimal point
+                    TempBuffer[i++] = *pointer++;
+                }
+                
                 addToken(TknFloat, TempBuffer); // if float exists
-            } 
-            else { // if number exists
+
+            } else { // if number exists
                 addToken(TknNumber, TempBuffer);
             }
 
@@ -216,6 +220,16 @@ void tokenize(const char *code) {
                 fprintf(stderr, "! Syntax Error: Invalid character '%c' after number.\n Recommendation: Check all numbers for invalid characters. Ensure all operators, identifiers, constants and words are properly seperated by spaces. \n");
                 exit(1);
             }
+
+            /* -- I think this may be the better way of checking for invalid characters after a number,
+            bc in ml its acceptable to find whitespaces after tokens -- but just double check LMAO
+
+            if (!isspace(*pointer) && *pointer != '+' && *pointer != '-' && *pointer != '*' && *pointer != '/' && 
+            *pointer != '(' && *pointer != ')' && *pointer != ',' && *pointer != '\0') {
+                fprintf(stderr, "! Syntax Error: Invalid character '%c' after number.\nRecommendation: Ensure that numbers are followed by operators, spaces, or valid symbols.\n", *pointer);
+                exit(1);
+            }
+            */
         }
 
         // check for strings (identifiers or reserved words)
@@ -262,10 +276,14 @@ void tokenize(const char *code) {
                     case ')':
                         TknType = TknBracket;  // if '(' and ')' (brackets) exists
                         break;
-                    case ')':
+                    case ',':
                         TknType = TknComma;  // if ',' (comma) exists
                         break;
         } 
+        
+        // was missing addToken after each case, so added here
+        addToken(TknType, TempBuffer);
+        pointer++;
 
         // check for assignment operator
         else if (*pointer == '<' && *(pointer + 1) == '-') { // if "<-" operator exists
@@ -275,7 +293,7 @@ void tokenize(const char *code) {
 
         // check for all other characters
         else { 
-            fprintf(stderr, "! Syntax Error: Illegal character exists in file.\n Recommendation: remove invalid symbols and all uppercase to fix. \n");
+            fprintf(stderr, "! Syntax Error: Illegal character '%c' exists in file.\n Recommendation: remove invalid symbols and all uppercase to fix. \n", *pointer); // just added what character its throwing an error for 
             exit(1);
         }
     }
