@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
@@ -31,7 +32,7 @@ typedef enum {
     TknTermOperator, // "+" or "-"
     TknFactorOperator, // "*" or "/"
     TknBracket, // "(" or ")"
-    TknComma // ","
+    TknComma, // ","
     TknEnd // "END" 
 } TknType;
 
@@ -47,8 +48,8 @@ int TknIndex = 0; // integer value that keeps track of our current position in a
 
 // function to add tokens to our "Tokens" array
 void addToken(TknType type, const char *value) { 
-    tokens[TknIndex].type = type; // sets type
-    strcpy(tokens[TknIndex].value, value); // sets value 
+    Tokens[TknIndex].type = type; // sets type
+    strcpy(Tokens[TknIndex].value, value); // sets value 
     TknIndex++; // increases token index/position pointer 
 }
 
@@ -71,32 +72,6 @@ bool isValidIdentifier(const char *str) {
     return true;
 }
 
-int main(int argc, char *argv[]) {
-    // error checking, if no. of args is less than 2 
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s <filename.ml>\n", argv[0]); // changed to fprintf to print to stderr instead of default data stream
-        return 1;
-    }
-
-    // the name of the file is at initial argument provided
-    char *filename = argv[1];
-
-    // checks if file name is .ml
-    size_t length = strlen(filename); // unsigned datatype, good for storing str length 
-    if (length < 3 || strcmp(filename + length - 3, ".ml") != 0) {
-        fprintf(stderr, "Error: File name must end with '.ml'\n");
-        return 1;
-    }
-
-    // read the file
-    int status = readFile(filename);
-
-    if (status == -1) {
-        return 1;
-    }
-    return 0;
-}
-
 int lineCount(FILE *file) {
     int count = 0;
     char c;
@@ -107,47 +82,6 @@ int lineCount(FILE *file) {
     }
     rewind(file);
     return count;
-}
-
-// function to read contents of a .ml file
-int readFile(char *filename) {
-
-    // opening file for reading
-    FILE *file = fopen(filename, "r");
-    
-    // error checking: file does not exist
-    if (file == NULL) {
-        fprintf(stderr, "Error: Could not open file %s\n", filename);
-        return -1;
-    }
-
-    // buffer holds each line
-    char line[MY_SIZE]; 
-    
-    // file reading logic
-    while (fgets(line, sizeof(line), file) != NULL) {
-        // remove new line char 
-        size_t len = strlen(line);
-        if (len > 0 && line[len - 1] == '\n') {
-            line[len - 1] = '\0';
-        }
-
-        // tokenize
-        tokenize(line);
-    }
-
-    // error checking: file is empty
-    if (ferror(file)) {
-        printf("Error: Could not read file %s\n", filename);
-        fclose(file);
-        return -1;
-    }
-
-    // real data type only supported - float, double and long double are real data types
-    
-    // closes file
-    fclose(file);
-    return 0;
 }
 
 // lexer function to convert code to token list
@@ -215,21 +149,22 @@ void tokenize(const char *code) {
                 addToken(TknNumber, TempBuffer);
             }
 
-            // check for invalid characters after the number
+            /* check for invalid characters after the number
             if (!isdigit(*pointer)) {
-                fprintf(stderr, "! Syntax Error: Invalid character '%c' after number.\n Recommendation: Check all numbers for invalid characters. Ensure all operators, identifiers, constants and words are properly seperated by spaces. \n");
+                fprintf(stderr, "! Syntax Error: Invalid character '%c' after number.\n Recommendation: Check all numbers for invalid characters. Ensure all operators, identifiers, constants and words are properly seperated by spaces. \n", *pointer);
                 exit(1);
             }
+            */
 
-            /* -- I think this may be the better way of checking for invalid characters after a number,
-            bc in ml its acceptable to find whitespaces after tokens -- but just double check LMAO
+            // I think this may be the better way of checking for invalid characters after a number,
+            // bc in ml its acceptable to find whitespaces after tokens -- but just double check LMAO
 
             if (!isspace(*pointer) && *pointer != '+' && *pointer != '-' && *pointer != '*' && *pointer != '/' && 
             *pointer != '(' && *pointer != ')' && *pointer != ',' && *pointer != '\0') {
                 fprintf(stderr, "! Syntax Error: Invalid character '%c' after number.\nRecommendation: Ensure that numbers are followed by operators, spaces, or valid symbols.\n", *pointer);
                 exit(1);
             }
-            */
+
         }
 
         // check for strings (identifiers or reserved words)
@@ -286,7 +221,7 @@ void tokenize(const char *code) {
         pointer++;
 
         // check for assignment operator
-        else if (*pointer == '<' && *(pointer + 1) == '-') { // if "<-" operator exists
+        } else if (*pointer == '<' && *(pointer + 1) == '-') { // if "<-" operator exists
             addToken(TknAssignmentOperator, "<-");
             pointer += 2;
         }
@@ -297,7 +232,51 @@ void tokenize(const char *code) {
             exit(1);
         }
     }
-    addToken(TknEnd, "END"); // End of input
+}
+
+// function to read contents of a .ml file
+int readFile(char *filename) {
+
+    // opening file for reading
+    FILE *file = fopen(filename, "r");
+    
+    // error checking: file does not exist
+    if (file == NULL) {
+        fprintf(stderr, "Error: Could not open file %s\n", filename);
+        return -1;
+    }
+
+    // buffer holds each line
+    char line[MY_SIZE]; 
+    
+    // file reading logic
+    while (fgets(line, sizeof(line), file) != NULL) {
+        // remove new line char 
+        size_t len = strlen(line);
+        if (len > 0 && line[len - 1] == '\n') {
+            line[len - 1] = '\0';
+        }
+
+        // tokenize
+        printf("Line: %s\n", line); // debug
+        tokenize(line);
+    }
+
+    // error checking: file is empty
+    if (ferror(file)) {
+        printf("Error: Could not read file %s\n", filename);
+        fclose(file);
+        return -1;
+    }
+
+    // real data type only supported - float, double and long double are real data types
+    
+    // closes file
+    fclose(file);
+    
+    addToken(TknEnd, "END");
+
+    return 0;
 }
 
 // defining translation to C function
@@ -316,4 +295,35 @@ void runInC() {
 // function to remove created C file and exec file
 void cleanupAfterExec() {
 
+}
+
+int main(int argc, char *argv[]) {
+    // error checking, if no. of args is less than 2 
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <filename.ml>\n", argv[0]); // changed to fprintf to print to stderr instead of default data stream
+        return 1;
+    }
+
+    // the name of the file is at initial argument provided
+    char *filename = argv[1];
+
+    // checks if file name is .ml
+    size_t length = strlen(filename); // unsigned datatype, good for storing str length 
+    if (length < 3 || strcmp(filename + length - 3, ".ml") != 0) {
+        fprintf(stderr, "Error: File name must end with '.ml'\n");
+        return 1;
+    }
+
+    // read the file
+    int status = readFile(filename); // also doing tokenisation
+
+    // more debugging
+    for (int i = 0; i < TknIndex; i++) {
+        print_token(Tokens[i]);
+    }
+
+    if (status == -1) {
+        return 1;
+    }
+    return 0;
 }
