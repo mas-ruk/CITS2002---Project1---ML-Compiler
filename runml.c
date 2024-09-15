@@ -328,6 +328,9 @@ int readFile(char *filename) {
 
     return 0;
 }
+
+//need to add a checker that checks there are max 50 unique identifiers
+
 // ###################################### TOKENISATION END ######################################
 
 // ###################################### PARSING START ######################################
@@ -342,15 +345,73 @@ and then generates a syntax tree based on the valid constructs
 */
 
 
+// Array to store function names
+char ExistingFunctions[50][256]; // based on max 50 unique identifiers
+int FunctionsCount = 0;  // Counter for the number of functions
+
+// Function to add function names to the array
+void addFunctionName(const char* identifier) {
+    if (FunctionsCount < 50) { //
+        strcpy(ExistingFunctions[FunctionsCount++], identifier);
+    }
+
 //parsing overall
 void pProgramItem() {
 if (currentTkn().type == TknFunction) {
         paFuncDef(); // go to function definitions
-}
 else{
     pStmt() // go to statements
 }
 
+}
+
+// parsing for existance of a function definition
+void pFuncDef() {
+        pNextToken();  // Go to next token
+        if (pCurrentTkn().type == TknIdentifier) {
+            addFunctionName(pCurrentTkn().value); // Store function name
+            pNextToken();
+// Expecting open bracket
+            if (pCurrentTkn().type == TknLBracket) {
+                pNextToken();  
+                if (pCurrentTkn).type == TknRBracket) { // expect closed bracket
+                    pNextToken();  // void function exists here
+                    pFuncStmt(); // parse for function statements
+                } 
+                else if {pCurrentTkn().type == TknIdentifier) {
+                    //do function thingys
+                }
+                    printf("Syntax Error: Expected ')' after function parameters\n");
+                    exit(1);
+                }
+            } else {
+                printf("Syntax Error: Expected '(' after function name\n");
+                exit(1);
+            }
+        } else {
+            printf("! SYNTAX ERROR: Expected identifier for function name\n");
+            exit(1);
+        }
+    }
+}
+
+pFuncStmt(){
+    //expect newline for end of void function
+    if (pCurrentTkn).type == TknNewline) {
+        pNextToken();
+        if (pCurrentTkn).type == TknTab {
+            pNextToken();
+            pStmt();
+        }
+        else {
+        printf("! SYNTAX ERROR: Expected tab/indentation before function statements. \n");
+        exit(1);
+        }
+    }
+    else {
+    printf("! SYNTAX ERROR: Expected new line for function statements. \n");
+    exit(1);
+    }
 }
 
 // parsing statements - print, return, assignment, functioncall
@@ -362,40 +423,36 @@ if (currentTkn().type == TknPrint) {
     } else if (currentTkn().type == TknIdentifier) {
         pAssignment();
     } else {
-        printf("! Syntax Error: Unexpected statement staring term. \n");
+        printf("! Syntax Error: Unexpected statement starting term. \n");
         exit(1);
     }
 }
 
-// test commit
+
+int pCurrentTknIndex = 0;
+
+// Move to the next token
+void pNextToken() {
+    pCurrentTknIndex++;
+}
+
+// Fetch the current token
+Token pCurrentTkn() {
+    return tokens[pCurrentTknIndex];
+}
+
+
+// need to work on below
 // calls the parser that corresponds to the token type
-void pToken() {
-    if (TknIndex >= 1000) {
+void Parser() {
+    if (pCurrentTknIndex >= 1000) {
         fprintf(stderr, "! Error: Token index out of bounds\n");
         exit(1);
     }
-    
+
     // current token
-    Token token = Tokens[TknIndex];
+    Token token = Tokens[pCurrentTknIndex];
 
-    switch (token.type) {
-        case TknNumber:
-            pTerm();
-            break;
-        case TknIdentifier:
-            pTerm();
-            break;
-        case TknPrint:
-        case TknReturn:
-            pStmt();
-            break;
-        default:
-            fprintf(stderr, "! Error: Unexpected token '%s'\n", token.value);
-            exit(1);
-    }
-
-    // increment 
-    TknIndex++;
 }
 
 void parser() {
