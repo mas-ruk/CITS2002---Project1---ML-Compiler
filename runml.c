@@ -423,19 +423,37 @@ void parser() {
 
 // ###################################### TRANSLATION TO C START ######################################
 
+void writeCFile() {
+    FILE *cFile = fopen("mlProgram.c", "w");
+    if (cFile == NULL) {
+        fprintf(stderr, "! Error: Could not create C file\n");
+        return;
+    }
+
+    // writing to C file
+    fprintf(cFile, "#include <stdio.h>\n\n");
+    fprintf(cFile, "int main() {\n");
+    fprintf(cFile, "toC(cFile, root);");
+    fprintf(cFile, "    return 0;\n");
+    fprintf(cFile, "}\n");
+
+    fclose(cFile);
+}
+
 // defining translation to C function
 void toC(FILE *cFile) {
 
 }
 
 void compileAndRunInC() {
-
+    system("gcc -o mlProgram mlProgram.c");
+    system("./mlProgram");
 }
-
 
 // function to remove created C file and exec file
 void cleanupAfterExec() {
-
+    remove("mlProgram.c");
+    remove("mlProgram");
 }
 
 // ###################################### TRANSLATION TO C END ######################################
@@ -472,6 +490,11 @@ int main(int argc, char *argv[]) {
 
     // parsing
     parser();
+
+    // translation to C
+    writeCFile();
+    compileAndRunInC();
+    cleanupAfterExec();
 
     return 0;
 }
