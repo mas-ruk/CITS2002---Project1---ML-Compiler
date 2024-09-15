@@ -342,21 +342,6 @@ and then generates a syntax tree based on the valid constructs
 */
 
 
-// parsing term - number/identifier
-void pTerm() {
-    
-}
-
-// parsing func calls
-void pFuncCall() {
-    
-}
-
-// parsing statements - print, return, assignment
-void pStmt() {
-
-}
-
 //parsing overall
 void pProgramItem() {
 if (currentTkn().type == TknFunction) {
@@ -382,7 +367,7 @@ if (currentTkn().type == TknPrint) {
     }
 }
 
-
+// test commit
 // calls the parser that corresponds to the token type
 void pToken() {
     if (TknIndex >= 1000) {
