@@ -357,6 +357,30 @@ void pStmt() {
 
 }
 
+//parsing overall
+void pProgramItem() {
+if (currentTkn().type == TknFunction) {
+        paFuncDef(); // go to function definitions
+}
+else{
+    pStmt() // go to statements
+}
+
+}
+
+// parsing statements - print, return, assignment, functioncall
+void pStmt() {
+if (currentTkn().type == TknPrint) {
+        pPrint();
+    } else if (currentTkn().type == TknReturn) {
+        pReturn();
+    } else if (currentTkn().type == TknIdentifier) {
+        pAssignment();
+    } else {
+        printf("! Syntax Error: Unexpected statement staring term. \n");
+        exit(1);
+    }
+}
 
 
 // calls the parser that corresponds to the token type
