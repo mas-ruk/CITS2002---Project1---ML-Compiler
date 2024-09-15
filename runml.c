@@ -493,7 +493,39 @@ void writeCFile() {
 }
 
 // defining translation to C function
-void toC(FILE *cFile) {
+void toC(AstNode* node, FILE *cFile) {
+    // first we gotta check if the node is existing
+    if (!node) {
+        return;
+    }
+
+    // define a switch case to accomodate the types of nodes
+    switch (node -> type){ // accessing node types
+        case nodeAssignment:
+            // variable assignment
+            fprintf(cFile, "%s = ", node -> data.assignment.identifier); // print variable name
+            toC(node->data.assignment.value, cFile); // 
+            fprintf(cFile, "\n");
+            break;
+        case nodeFunctionCall:
+            fprintf(cFile, "%s(", node -> data.functionCall.name);
+            break;
+        case nodeFunctionDef:
+            break;
+        case nodeIdentifier:
+            fprintf(cFile, "%s", node -> data.identifier);
+            toC(node->data.identifier, cFile);
+            break;
+        case nodeNumber:
+            break;
+        case nodePrint:
+            break;
+        case nodeReturn:
+            break;
+        case nodeOperator:
+            break;
+    }
+
 
 }
 
