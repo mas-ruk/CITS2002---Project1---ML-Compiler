@@ -408,6 +408,61 @@ void parser() {
 
 // ###################################### TRANSLATION TO C START ######################################
 
+// defining translation to C function
+void toC(FILE *cFile, AstNode *node) {
+    if (node == NULL) {
+        return;
+    }
+
+    switch (node->type) {
+        case nodeNumber:
+            fprintf(cFile, "%s", node->data.number);
+            break;
+        case nodeIdentifier:
+            fprintf(cFile, "%s", node->data.identifier);
+            break;
+        case nodeOperator:
+            toC(cFile, node->data.operator.left);
+            switch (node->data.operator.op) {
+                case '+':
+                    fprintf(cFile, " + ");
+                    break;
+                case '-':
+                    fprintf(cFile, " - ");
+                    break;
+                case '*':
+                    fprintf(cFile, " * ");
+                    break;
+                case '/':
+                    fprintf(cFile, " / ");
+                    break;
+                default:
+                    fprintf(stderr, "! Error: Unsupported operator\n");
+                    exit(1);
+            }
+            toC(cFile, node->data.operator.right);
+            break;
+        case nodeAssignment:
+            fprintf(cFile, "%s <-", node->data.assignment.identifier);
+            toC(cFile, node->data.assignment.value);
+            break;
+        case nodePrint:
+            fprintf(cFile, "printf(\"%%f\\n\", ");
+            toC(cFile, node->left);
+            break;
+        case nodeReturn:
+            fprintf(cFile, "return ");
+            toC(cFile, node->data.returnStatement.value);
+            break;
+        case nodeFunctionDef:
+            fprintf(cFile, "double %s(", node->value);
+
+        default:
+            fprintf(stderr, "! Error: Unsupported node type\n");
+            exit(1);
+    }
+}
+
 void writeCFile() {
     FILE *cFile = fopen("mlProgram.c", "w");
     if (cFile == NULL) {
@@ -415,19 +470,17 @@ void writeCFile() {
         return;
     }
 
-    // writing to C file
-    fprintf(cFile, "#include <stdio.h>\n\n");
+    // header stuff
+    fprintf(cFile, "#include <stdio.h>\n");
+    fprintf(cFile, "#include <math.h>\n");
+
+    // main function
     fprintf(cFile, "int main() {\n");
     fprintf(cFile, "toC(cFile, root);");
     fprintf(cFile, "    return 0;\n");
     fprintf(cFile, "}\n");
 
     fclose(cFile);
-}
-
-// defining translation to C function
-void toC(FILE *cFile) {
-
 }
 
 void compileAndRunInC() {
