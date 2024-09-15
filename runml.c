@@ -332,6 +332,16 @@ int readFile(char *filename) {
 
 // ###################################### PARSING START ######################################
 
+/* 
+a parser organises tokens into a structured form based on the grammer of the language
+i.e. goes through the following steps: token organisation, 
+validation (if sequence of tokens forms valid constructs according to ml specs),
+and then generates syntax tree
+i.e. checks if an assignment is correct (i.e. x = 5 is valid but 5 = x is not)
+and then generates a syntax tree based on the valid constructs 
+*/
+
+
 // parsing term - number/identifier
 void pTerm() {
 
@@ -347,13 +357,9 @@ void pStmt() {
 
 }
 
-void parser() {
-// a parser organises tokens into a structured form based on the grammer of the language
-// i.e. goes through the following steps: token organisation, 
-// validation (if sequence of tokens forms valid constructs according to ml specs),
-// and then generates syntax tree
-// i.e. checks if an assignment is correct (i.e. x = 5 is valid but 5 = x is not)
-// and then generates a syntax tree based on the valid constructs
+// calls the parser that corresponds to the token type
+void pToken() {
+
     
 
 }
