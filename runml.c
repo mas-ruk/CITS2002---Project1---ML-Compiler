@@ -294,7 +294,7 @@ int readFile(char *filename) {
     
     // error checking: file does not exist
     if (file == NULL) {
-        fprintf(stderr, "Error: Could not open file %s\n", filename);
+        fprintf(stderr, "! Error: Could not open file %s\n", filename);
         return -1;
     }
 
@@ -316,7 +316,7 @@ int readFile(char *filename) {
 
     // error checking: file is empty
     if (ferror(file)) {
-        printf("Error: Could not read file %s\n", filename);
+        printf("! Error: Could not read file %s\n", filename);
         fclose(file);
         return -1;
     }
@@ -344,7 +344,7 @@ and then generates a syntax tree based on the valid constructs
 
 // parsing term - number/identifier
 void pTerm() {
-
+    
 }
 
 // parsing func calls
@@ -357,11 +357,42 @@ void pStmt() {
 
 }
 
+
+
 // calls the parser that corresponds to the token type
 void pToken() {
-
+    if (TknIndex >= 1000) {
+        fprintf(stderr, "! Error: Token index out of bounds\n");
+        exit(1);
+    }
     
+    // current token
+    Token token = Tokens[TknIndex];
 
+    switch (token.type) {
+        case TknNumber:
+            pTerm();
+            break;
+        case TknIdentifier:
+            pTerm();
+            break;
+        case TknPrint:
+        case TknReturn:
+            pStmt();
+            break;
+        default:
+            fprintf(stderr, "! Error: Unexpected token '%s'\n", token.value);
+            exit(1);
+    }
+
+    // increment 
+    TknIndex++;
+}
+
+void parser() {
+    while(TknIndex < 1000 && Tokens[TknIndex].type != TknEnd) {
+        pToken();
+    };
 }
 
 // ###################################### PARSING END ######################################
@@ -398,7 +429,7 @@ int main(int argc, char *argv[]) {
     // checks if file name is .ml
     size_t length = strlen(filename); // unsigned datatype, good for storing str length 
     if (length < 3 || strcmp(filename + length - 3, ".ml") != 0) {
-        fprintf(stderr, "Error: File name must end with '.ml'\n");
+        fprintf(stderr, "! Error: File name must end with '.ml'\n");
         return 1;
     }
 
@@ -409,10 +440,14 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // debugging tokens
     printf("Tokens after tokenisation\n");
     for (int i = 0; i < TknIndex; i++) {
         print_token(Tokens[i]);
     }
+
+    // parsing
+    parser();
 
     return 0;
 }
