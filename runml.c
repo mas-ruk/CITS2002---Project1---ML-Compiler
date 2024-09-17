@@ -16,6 +16,7 @@
 
 // defining array size to take in .ml lines
 #define MY_SIZE 1000
+#define MAX_NODES 1000
 
 // initalise different token types for our lexer, values described in comments
 typedef enum { 
@@ -294,7 +295,7 @@ int readFile(char *filename) {
     
     // error checking: file does not exist
     if (file == NULL) {
-        fprintf(stderr, "! Error: Could not open file %s\n", filename);
+        fprintf(stderr, "@ Error: Could not open file %s\n", filename);
         return -1;
     }
 
@@ -316,7 +317,7 @@ int readFile(char *filename) {
 
     // error checking: file is empty
     if (ferror(file)) {
-        printf("! Error: Could not read file %s\n", filename);
+        printf("@ Error: Could not read file %s\n", filename);
         fclose(file);
         return -1;
     }
@@ -344,6 +345,22 @@ i.e. checks if an assignment is correct (i.e. x = 5 is valid but 5 = x is not)
 and then generates a syntax tree based on the valid constructs 
 */
 
+AstNode nodes[MAX_NODES]; // not using malloc, static allocation
+int nodeCount = 0;
+
+// now AST is defined, we must add nodes to AST based on their type
+AstNode* numNode(double num) {
+    if (nodeCount < MAX_NODES) {
+        AstNode *node = &nodes[nodeCount++];
+        node -> type = nodeNumber;
+        node -> data.number = num;
+        return node;
+    } else {
+        fprintf(stderr, "@ Error: Maximum no. of nodes reached. Memory allocation exhausted.");
+        exit(EXIT_FAILURE);
+    };
+    
+}
 
 // Array to store function names
 char ExistingFunctions[50][256]; // based on max 50 unique identifiers
@@ -381,15 +398,15 @@ void pFuncDef() {
                 else if {pCurrentTkn().type == TknIdentifier) {
                     //do function thingys
                 }
-                    printf("Syntax Error: Expected ')' after function parameters\n");
+                    printf("! Syntax Error: Expected ')' after function parameters\n");
                     exit(1);
                 }
             } else {
-                printf("Syntax Error: Expected '(' after function name\n");
+                printf("! Syntax Error: Expected '(' after function name\n");
                 exit(1);
             }
         } else {
-            printf("! SYNTAX ERROR: Expected identifier for function name\n");
+            printf("! Syntax Error: Expected identifier for function name\n");
             exit(1);
         }
     }
@@ -404,12 +421,12 @@ pFuncStmt(){
             pStmt();
         }
         else {
-        printf("! SYNTAX ERROR: Expected tab/indentation before function statements. \n");
+        printf("! Syntax Error: Expected tab/indentation before function statements. \n");
         exit(1);
         }
     }
     else {
-    printf("! SYNTAX ERROR: Expected new line for function statements. \n");
+    printf("! Syntax Error: Expected new line for function statements. \n");
     exit(1);
     }
 }
