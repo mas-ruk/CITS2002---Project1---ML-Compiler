@@ -45,8 +45,11 @@ Token;
 
 // node types for AST 
 typedef enum {
-    nodeNumber,
-    nodeIdentifier,
+    nodeProgram, // actual root program
+    nodeStatement, 
+    nodeExpression,
+    nodeTerm,
+    nodeFactor,
     nodeOperator,
     nodeFunctionCall,
     nodeFunctionDef,
@@ -55,46 +58,63 @@ typedef enum {
     nodePrint
 } NodeType;
 
-// further definition of each operator
-typedef enum {
-    operAdd,
-    operSubtract,
-    operDivide,
-    operMultiply
-} OperType;
-
 // AST Structure
 typedef struct AstNode {
     NodeType type;
     union {
-        double number;
-        char *identifier;
+        // to account for lines/statements in program we need to create an overarching program node
         struct {
-            OperType oper;
-            struct AstNode *left;
-            struct AstNode *right;
-        } operator;
+            struct AstNode **statements; // holds all statements in program
+            int lineCount;
+        } program;
+        // statement node
         struct {
-            char *name;
-            struct AstNode *arguments;
-        } functionCall;
+            struct AstNode *expression; // used in stmt
+            struct AstNode *functionCall; 
+            char *identifier; // print and assignment
+        } stmt;
+        // expression node
         struct {
-            char *name;
-            struct AstNode *arguments;
-            struct AstNode *body;
-        } functionDef;
+            struct AstNode *lTerm; // 
+            char *oper;
+            struct AstNode *rTerm;
+        } exp;
+        // term node
         struct {
-            struct AstNode *value;
-        } returnStatement;
+
+        };
+        // factor node
         struct {
-            char *identifier;
-            struct AstNode *value;
-        } assignment;
+
+        };
+        // func call node
         struct {
-            struct AstNode *value;
-        } print;
+
+        };
+        // func def node
+        struct {
+
+        };
+        // assignment node
+        struct {
+
+        };
+        // print
+        struct {
+
+        };
+        // return
+        struct {
+
+        };
     } data;
 } AstNode;
+
+// we didnt have a way of representing the statements each in the program so here's a node for it
+struct {
+    struct AstNode **statements; // array for statements
+    int statementCount;
+} statementSeq;
 
 // ###################################### TOKENISATION START ######################################
 
@@ -345,8 +365,54 @@ i.e. checks if an assignment is correct (i.e. x = 5 is valid but 5 = x is not)
 and then generates a syntax tree based on the valid constructs 
 */
 
+/*
+program:
+        ( program-item )*
+
+program-item:
+        statement
+        |  function identifier ( identifier )*
+        ←–tab–→ statement1
+        ←–tab–→ statement2
+        ....
+
+statement:
+        identifier "<-" expression
+        |  print  expression
+        |  return expression
+        |  functioncall
+
+expression:
+        term   [ ("+" | "-")  expression ]
+
+term:
+        factor [ ("*" | "/")  term ]
+
+factor:
+        realconstant
+        | identifier
+        | functioncall
+        | "(" expression ")"
+
+functioncall:
+        identifier "(" [ expression ( "," expression )* ] ")"
+*/
+
+
 AstNode nodes[MAX_NODES]; // not using malloc, static allocation
 int nodeCount = 0;
+
+AstNode* stmtNode(AstNode* expr) {
+    if (nodeCount < MAX_NODES) {
+        AstNode *node = &nodes[nodeCount++];
+        node -> type = nodeStmt;
+        node -> data.stmt = expr;
+        return node;
+    } else {
+        fprintf(stderr, "@ Error: Maximum no. of nodes reached. Memory allocation exhausted.");
+        exit(EXIT_FAILURE);
+    }
+}
 
 // now AST is defined, we must add nodes to AST based on their type
 AstNode* numNode(double num) {
@@ -361,6 +427,8 @@ AstNode* numNode(double num) {
     };
     
 }
+
+AstNode
 
 // Array to store function names
 char ExistingFunctions[50][256]; // based on max 50 unique identifiers
