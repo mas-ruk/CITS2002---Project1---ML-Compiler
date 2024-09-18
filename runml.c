@@ -46,11 +46,10 @@ Token;
 // node types for AST 
 typedef enum {
     nodeProgram, // actual root program
-    nodeStatement, 
+    nodeStmt, 
     nodeExpression,
     nodeTerm,
     nodeFactor,
-    nodeOperator,
     nodeFunctionCall,
     nodeFunctionDef,
     nodeReturn,
@@ -421,13 +420,25 @@ functioncall:
 
 
 AstNode nodes[MAX_NODES]; // not using malloc, static allocation
-int nodeCount = 0;
+int tokenCount = 0;
+int currentTokenIndex = 0;
+int pCurrentTknIndex = 0;
+nodeCount = 0;
 
-AstNode* stmtNode(AstNode* expr) {
+// Fetch the current token
+Token pCurrentTkn() {
+    return Tokens[currentTokenIndex];
+}
+
+// Move to the next token
+void pNextToken() {
+    pCurrentTknIndex++;
+}
+
+AstNode* createNode(NodeType type){
     if (nodeCount < MAX_NODES) {
         AstNode *node = &nodes[nodeCount++];
-        node -> type = nodeStmt;
-        node -> data.stmt = expr;
+        node -> type = type;
         return node;
     } else {
         fprintf(stderr, "@ Error: Maximum no. of nodes reached. Memory allocation exhausted.");
@@ -435,21 +446,40 @@ AstNode* stmtNode(AstNode* expr) {
     }
 }
 
-// now AST is defined, we must add nodes to AST based on their type
-AstNode* numNode(double num) {
-    if (nodeCount < MAX_NODES) {
-        AstNode *node = &nodes[nodeCount++];
-        node -> type = nodeNumber;
-        node -> data.number = num;
-        return node;
-    } else {
-        fprintf(stderr, "@ Error: Maximum no. of nodes reached. Memory allocation exhausted.");
-        exit(EXIT_FAILURE);
-    };
+
+AstNode* program() {
     
 }
 
-AstNode
+AstNode* stmtNode(AstNode* expr) {
+    AstNode* stmtNode = createNode(nodeStmt);
+    if (!stmtNode) {
+        fprintf(stderr, "@ Error: Failed to create statement node.\n");
+        exit(EXIT_FAILURE);
+    }
+    // parsing statement
+    if (pCurrentTkn().type == TknPrint) {
+        pPrint();
+    } else if (pCurrentTkn().type == TknReturn) {
+        pReturn();
+    } else if (pCurrentTkn().type == TknIdentifier) {
+        pAssignment();
+    } else {
+        printf("! Syntax Error: Unexpected statement starting term. \n");
+        exit(1);
+    }
+}
+
+AstNode* expNode(AstNode* term) {
+    AstNode* expNode = createNode(nodeTerm);
+    if (!expNode) {
+        fprintf(stderr, "@ Error: Failed to create expression node.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // parsing
+
+}
 
 // Array to store function names
 char ExistingFunctions[50][256]; // based on max 50 unique identifiers
@@ -518,53 +548,6 @@ pFuncStmt(){
     printf("! Syntax Error: Expected new line for function statements. \n");
     exit(1);
     }
-}
-
-// parsing statements - print, return, assignment, functioncall
-void pStmt() {
-if (currentTkn().type == TknPrint) {
-        pPrint();
-    } else if (currentTkn().type == TknReturn) {
-        pReturn();
-    } else if (currentTkn().type == TknIdentifier) {
-        pAssignment();
-    } else {
-        printf("! Syntax Error: Unexpected statement starting term. \n");
-        exit(1);
-    }
-}
-
-
-int pCurrentTknIndex = 0;
-
-// Move to the next token
-void pNextToken() {
-    pCurrentTknIndex++;
-}
-
-// Fetch the current token
-Token pCurrentTkn() {
-    return tokens[pCurrentTknIndex];
-}
-
-
-// need to work on below
-// calls the parser that corresponds to the token type
-void parser() {
-    if (pCurrentTknIndex >= 1000) {
-        fprintf(stderr, "! Error: Token index out of bounds\n");
-        exit(1);
-    }
-
-    // current token
-    Token token = Tokens[pCurrentTknIndex];
-
-}
-
-void parser() {
-    while(TknIndex < 1000 && Tokens[TknIndex].type != TknEnd) {
-        pToken();
-    };
 }
 
 // ###################################### PARSING END ######################################
