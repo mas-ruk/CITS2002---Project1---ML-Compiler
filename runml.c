@@ -523,7 +523,7 @@ void pFactor(){
         //not function call
         else    {
         pNextToken();
-            if (pCurrentTkn().type != TknNewline) {
+            if (pCurrentTkn().type != TknNewline && pCurrentTkn().type != TknEnd) {
             printf ("! SYNTAX ERROR: Expected new line after non-function name identifier\n.")
             exit(1);
             }
@@ -608,6 +608,7 @@ void pAssOrFuncCall(){
         pNextToken();
     // check for assignment existance
         if (pCurrentTkn().type == TknAssignmentOperator) {
+            pNextToken();
             pExpression(); // Parse right hand side of expression
         }
         else {
@@ -663,7 +664,7 @@ void pFuncDef() {
                 if (pCurrentTkn).type == TknRBracket) { // expect closed bracket
                     pNextToken();  // void function exists here
                 } 
-                
+                else {
                 // loop through function parameters (Id, comma, Id, comma...)
                 while (pCurrentTkn().type == TknIdentifier) {
                     pNextToken();  
@@ -673,6 +674,7 @@ void pFuncDef() {
                         if (pCurrentTkn().type != TknIdentifier) { // if non identifier appears
                         printf("! SYNTAX ERROR: Expected identifier after ',' in function argument\n");
                         exit(1);
+                        }
                     }
                     else if (pCurrentTkn().type == TknRBracket) {
                         pNextToken(); // function parameter list ends 
@@ -690,14 +692,16 @@ void pFuncDef() {
                         printf("! SYNTAX ERROR: Expected ',' or ')' after function argument\n");
                         exit(1);
                     }
+                        
             } 
                 printf("! SYNTAX ERROR: Expected ')' after function argument\n");
                 exit(1);
-        } 
+        }
+        }
         else {
             printf("! SYNTAX ERROR: Expected '(' after function name\n");
             exit(1);'
-                }
+        }
     } 
     else {
         printf("! SYNTAX ERROR: Expected identifier for function name\n");
@@ -712,7 +716,7 @@ void pProgramItem() {
             pFuncDef(); // go to function definitions
         }
         else {
-        pStmt() // go to statements
+        pStmt(); // go to statements
         }
     }
 }
