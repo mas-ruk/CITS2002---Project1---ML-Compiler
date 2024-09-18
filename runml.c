@@ -67,46 +67,67 @@ typedef struct AstNode {
             struct AstNode **statements; // holds all statements in program
             int lineCount;
         } program;
+        
         // statement node
         struct {
             struct AstNode *expression; // used in stmt
             struct AstNode *functionCall; 
             char *identifier; // print and assignment
         } stmt;
+        
         // expression node
         struct {
             struct AstNode *lTerm; // 
-            char *oper;
+            char *oper; // + or -
             struct AstNode *rTerm;
         } exp;
+        
         // term node
         struct {
-
-        };
+            struct AstNode *lTerm;
+            char *oper; // x or /
+            struct AstNode *rTerm;
+        } term;
+        
         // factor node
         struct {
+            float constant; // using float as we only require 6 digits of precision
+            char* identifier;
+            struct AstNode *funcCall;
+            struct AstNode *subExp; // expressions in parentheses
+        } factor;
 
-        };
         // func call node
         struct {
-
-        };
+            char* identifier;
+            struct AstNode **args;
+            int argCount;
+        } funcCall;
+        
         // func def node
         struct {
-
-        };
+            char *identifier;
+            struct AstNode **params;
+            int paramCount;
+            struct AstNode **body;
+            int stmtCount;
+        } funcDef;
+        
         // assignment node
         struct {
-
-        };
+            char* identifier; // var
+            struct AstNode *exp;
+        } assignment;
+        
         // print
         struct {
-
-        };
+            struct AstNode *exp;
+        } print;
+        
         // return
         struct {
-
-        };
+            struct AstNode *exp;
+        } rtrn;
     } data;
 } AstNode;
 
