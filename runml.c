@@ -53,6 +53,7 @@ typedef enum {
     nodeFactor,
     nodeFunctionCall,
     nodeFunctionDef,
+    nodeParam,
     nodeReturn,
     nodeAssignment,
     nodePrint
@@ -437,11 +438,6 @@ void pNextToken() {
     pCurrentTknIndex++;
 }
 
-// need to find a way to get the opeer string
-char* getOperStr(int tType) {
-
-}
-
 // add new node from token to tree
 AstNode* createNode(NodeType type){
     if (nodeCount < MAX_NODES) {
@@ -525,28 +521,42 @@ AstNode* pFactor() {
     }
     return factorNode;
 }
-// creating that left right operator child tree
-AstNode* pTerm(){
-    AstNode* termNode = pFactor(); // parse first factor
 
-    while (pCurrentTkn().type == TknTermOperator) {
-        pNextToken();  
-        termNode = createNode(nodeTerm);
-    }
+// creating that left right operator child tree
+AstNode* pTerm(){    
+    AstNode* fctrNode = pFactor(); // parse first factor
+    // if is factor operator must parse recursively
+    if (pCurrentTkn().type == TknFactorOperator) {
+        char* oper = strdup(pCurrentTkn().value); // store oper
+        pNextToken(); // move to next token
+        AstNode* rVarNode = pTerm(); // parse next token
+        AstNode* termNode = createNode(nodeTerm);
+        termNode -> data.term.lVar = fctrNode; // node given lVar property i.e. the left factor
+        termNode -> data.term.rVar = rVarNode; // right variable 
+        termNode -> data.term.oper = oper; // operator assigned as well
+        return termNode; 
+    } return fctrNode;
 }
 
 AstNode* pExpression(){
     AstNode* termNode = pTerm(); // parse first term
-
-    while (pCurrentTkn().type == TknTermOperator) {
-        pNextToken();  
-        pExpression();  // Parse the next expression
-    }
+    if (pCurrentTkn().type == TknTermOperator) {
+        char* oper = strdup(pCurrentTkn().value);
+        pNextToken();
+        AstNode* rVarNode = pExpression();
+        AstNode* exprNode = createNode(nodeExpression);
+        exprNode -> data.exp.lVar = termNode;
+        exprNode -> data.exp.rVar = rVarNode;
+        exprNode -> data.exp.oper = oper;
+        return exprNode;
+    } return termNode;
 }
 
 AstNode* pFuncCall() {
-    // Consume the function name
-    pNextToken();  // Move past the function name
+    AstNode* funcCallNode = createNode(nodeFunctionCall);
+
+    // Consume (EDIT: STORE) the function name
+    funcCallNode -> data.funcCall.identifier = strdup(Tokens[pCurrentTknIndex - 1].value);
 
     // Check for the left bracket
     if (pCurrentTkn().type == TknLBracket) {
@@ -555,7 +565,8 @@ AstNode* pFuncCall() {
         // parse parameters
         if (pCurrentTkn().type != TknRBracket) {
             // Parse the first expression or parameter
-            pExpression();  // or use pFactor() if parameters are single values
+            AstNode* paramNode = pExpression();
+            funcCallNode -> data.funcCall.args[funcCallNode -> data.funcCall.argCount++] = paramNode;
 
             // Check for additional parameters separated by commas
             while (pCurrentTkn().type == TknComma) {
