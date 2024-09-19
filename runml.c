@@ -566,6 +566,10 @@ AstNode* pFuncCall() {
         if (pCurrentTkn().type != TknRBracket) {
             // Parse the first expression or parameter
             AstNode* paramNode = pExpression();
+            // ok this is a hell of a line but basically what this is doing
+            // is it accesses the funcCallNode that we've created 
+            // and then puts in the paramNode at the index identified by argCount as far as i can tell lmao
+            // cross fingers it works LMAO
             funcCallNode -> data.funcCall.args[funcCallNode -> data.funcCall.argCount++] = paramNode;
 
             // Check for additional parameters separated by commas
