@@ -433,8 +433,13 @@ Token pCurrentTkn() {
     return Tokens[pCurrentTknIndex];
 }
 
-// Move to the next token
-void pNextToken() {
+// here is a function to grab the next token
+Token getNextTkn() {
+    return Tokens[pCurrentTknIndex++];
+}
+
+// Increment token index
+Token pMoveToNextTkn() {
     pCurrentTknIndex++;
 }
 
@@ -482,13 +487,13 @@ AstNode* pFactor() {
     if (pCurrentTkn().type == TknNumber) {
         factorNode = createNode(nodeFactor);
         factorNode -> data.factor.constant = atof(pCurrentTkn().value);
-        pNextToken();
+        pMoveToNextTkn();
     }
     // check for float existence
     else if (pCurrentTkn().type == TknFloat) {
         factorNode = createNode(nodeFactor);
         factorNode -> data.factor.constant = atof(pCurrentTkn().value);
-        pNextToken();
+        pMoveToNextTkn();
     } else if (pCurrentTkn().type == TknIdentifier) {
         // if function call
         if (doesFunctionExist(pCurrentTkn().value)) { 
@@ -499,14 +504,14 @@ AstNode* pFactor() {
         else    {
             factorNode = createNode(nodeFactor);
             factorNode -> data.factor.identifier = strdup(pCurrentTkn().value);
-            pNextToken();
+            pMoveToNextTkn();
                 if (pCurrentTkn().type != TknNewline && pCurrentTkn().type != TknEnd) {
                 printf ("! SYNTAX ERROR: Expected new line after non-function name identifier\n.");
                 exit(1);
                 }
             }
     } else if (pCurrentTkn().type == TknLBracket) {
-        pNextToken();
+        pMoveToNextTkn();
         factorNode = createNode(nodeFactor);
         // check stuff within the brackets 
         factorNode -> data.factor.subExp = pExpression();
@@ -514,7 +519,7 @@ AstNode* pFactor() {
                 printf("! SYNTAX ERROR: Invalid factor. Expected ')' after expression.\n");
                 exit(1);
             }    
-        pNextToken(); // consume ')'
+        pMoveToNextTkn(); // consume ')'
     } else {
         printf("! SYNTAX ERROR: Invalid factor. Expected functioncall, real constant, identifer or '(' expression ')'.\n.");
         exit(1);
@@ -528,7 +533,7 @@ AstNode* pTerm(){
     // if is factor operator must parse recursively
     if (pCurrentTkn().type == TknFactorOperator) {
         char* oper = strdup(pCurrentTkn().value); // store oper
-        pNextToken(); // move to next token
+        pMoveToNextTkn(); // move to next token
         AstNode* rVarNode = pTerm(); // parse next token
         AstNode* termNode = createNode(nodeTerm);
         termNode -> data.term.lVar = fctrNode; // node given lVar property i.e. the left factor
@@ -542,7 +547,7 @@ AstNode* pExpression(){
     AstNode* termNode = pTerm(); // parse first term
     if (pCurrentTkn().type == TknTermOperator) {
         char* oper = strdup(pCurrentTkn().value);
-        pNextToken();
+        pMoveToNextTkn();
         AstNode* rVarNode = pExpression();
         AstNode* exprNode = createNode(nodeExpression);
         exprNode -> data.exp.lVar = termNode;
@@ -552,16 +557,21 @@ AstNode* pExpression(){
     } return termNode;
 }
 
+#define MAX_ARGS 1000
 AstNode* pFuncCall() {
     AstNode* funcCallNode = createNode(nodeFunctionCall);
 
     // Consume (EDIT: STORE) the function name
     funcCallNode -> data.funcCall.identifier = strdup(Tokens[pCurrentTknIndex - 1].value);
 
+    // throwing errors so lets do some malloc bullcrap
+    funcCallNode -> data.funcCall.args = malloc(sizeof(AstNode*) * MAX_ARGS);
+    funcCallNode -> data.funcCall.argCount = 0;
+
     // Check for the left bracket
     if (pCurrentTkn().type == TknLBracket) {
-        pNextToken();  // Consume '('
-
+        pMoveToNextTkn();  // Consume '('
+        
         // parse parameters
         if (pCurrentTkn().type != TknRBracket) {
             // Parse the first expression or parameter
@@ -574,8 +584,9 @@ AstNode* pFuncCall() {
 
             // Check for additional parameters separated by commas
             while (pCurrentTkn().type == TknComma) {
-                pNextToken();  // Consume ','
-                pExpression();  // Parse the next parameter
+                pMoveToNextTkn();  // Consume ','
+                AstNode* paramNode = pExpression(); // Parse the next parameter
+                funcCallNode -> data.funcCall.args[funcCallNode -> data.funcCall.argCount++] = paramNode;
             }
         }
         
@@ -584,14 +595,14 @@ AstNode* pFuncCall() {
             printf("! SYNTAX ERROR: Expected ')' after function parameters.\n");
             exit(1);
         }
-        pNextToken();  // Consume ')'
+        pMoveToNextTkn();  // Consume ')'
     } 
     else {
         printf("! SYNTAX ERROR: Expected '(' after functioncall.\n");
         exit(1);
     }
+    return funcCallNode;
 }
-
 
 // NOTE: assuming all functions have unique identifiers and will not rewrite over the previous function
 // Parsing over assignment/function call
@@ -601,10 +612,10 @@ void pAssOrFuncCall(){
         pFuncCall();
     }
     else {
-        pNextToken();
+        pMoveToNextTkn();
     // check for assignment existance
         if (pCurrentTkn().type == TknAssignmentOperator) {
-            pNextToken();
+            pMoveToNextTkn();
             pExpression(); // Parse right hand side of expression
         }
         else {
@@ -615,13 +626,14 @@ void pAssOrFuncCall(){
 }
 
 // parsing over statements
-AstNode* pStmt(AstNode* stmtNode){
-    //Check for function statement
+AstNode* pStmt(){
+    // turning the below into a switch case to consolidate
+    /* //Check for function statement
     if (pCurrentTkn().type == TknTab) { 
         pNextToken();
         pStmt(stmtNode);
     }
-    //Check for identifier  
+    // Check for identifier  
     else if (pCurrentTkn().type == TknIdentifier) {
         pAssOrFuncCall(); 
     }
@@ -641,42 +653,76 @@ AstNode* pStmt(AstNode* stmtNode){
         printf("! SYNTAX ERROR: Unexpected token in statement. Valid statement starting arguments include an identifier, 'print' or 'return'. \n");
         exit(1);
     }
+    */
+    AstNode* stmtNode = createNode(nodeStmt);
+    switch (pCurrentTkn().type){
+        case TknIdentifier:
+            if (doesFunctionExist(pCurrentTkn().value)) {
+                // function call
+                stmtNode -> type = nodeFunctionCall;
+                stmtNode -> data.funcCall.identifier = strdup(pCurrentTkn().value);
+                // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NEEDS FIXING
+                stmtNode -> data.funcCall = pFuncCall();
+            } else {
+                // assignment
+                pMoveToNextTkn();
+                stmtNode -> type = nodeAssignment;
+                stmtNode -> data.assignment.identifier = strdup(pCurrentTkn().value);
+                pMoveToNextTkn(); // eat <-
+                stmtNode -> data.assignment.exp = pExpression();
+            }
+            break;
+        case TknPrint:
+            pMoveToNextTkn(); // eat print nom nom nom 
+            stmtNode -> type = nodePrint;
+            stmtNode -> data.print.exp = pExpression();
+            break;
+        case TknReturn:
+            pMoveToNextToken();
+            stmtNode -> type = nodeReturn;
+            stmtNode -> data.rtrn.exp = pExpression();
+            break;
+        default:
+            // error rip
+            printf("! SYNTAX ERROR: unexpected token lmao. valid statement starting args include print, return and function calls.");
+    }
+    return stmtNode;
 }
 
 // parsing over a function definition
-void pFuncDef() {
-        pNextToken();  // Go to next token
+AstNode* pFuncDef() {
+        pMoveToNextTkn();  // Go to next token
         if (pCurrentTkn().type == TknIdentifier) {
             if (doesFunctionExist(pCurrentTkn().value)) {  // check for if function already exists
                 printf("! SYNTAX ERROR: Function name '%s' already definied\n", pCurrentTkn().value);
                 exit(1);
             }
             addFunctionName(pCurrentTkn().value); // Store function name
-            pNextToken();
+            pMoveToNextTkn();
             
             // Expecting open bracket
             if (pCurrentTkn().type == TknLBracket) {
-                pNextToken();  
+                pMoveToNextTkn();  
 
                 //check for closing bracket (empty parameter lsit)
                 if (pCurrentTkn().type == TknRBracket) { // expect closed bracket
-                    pNextToken();  // void function exists here
+                    pMoveToNextTkn();  // void function exists here
                 } else {
                 // loop through function parameters (Id, comma, Id, comma...)
                 while (pCurrentTkn().type == TknIdentifier) {
-                    pNextToken();  
+                    pMoveToNextTkn();  
                     
                     if (pCurrentTkn().type == TknComma) { // expect comma
-                        pNextToken(); 
+                        pMoveToNextTkn(); 
                         if (pCurrentTkn().type != TknIdentifier) { // if non identifier appears
                         printf("! SYNTAX ERROR: Expected identifier after ',' in function argument\n");
                         exit(1);
                         }
                     }
                     else if (pCurrentTkn().type == TknRBracket) {
-                        pNextToken(); // function parameter list ends 
+                        pMoveToNextTkn(); // function parameter list ends 
                             if (pCurrentTkn().type == TknNewline) {
-                                pNextToken();
+                                pMoveToNextTkn();
                                 pStmt(); // run stmt for next lines
                                 return;
                             }
@@ -704,8 +750,7 @@ void pFuncDef() {
     }
 }
 
-
-AstNode* program() {
+AstNode* pProgram() {
     AstNode* programNode = createNode(nodeProgram);
     
     // line count
@@ -717,51 +762,10 @@ AstNode* program() {
         if (stmtNode != NULL) {
             programNode -> data.program.statements[programNode->data.program.lineCount++] = stmtNode;
         }
-        pNextToken();
+        pMoveToNextTkn();
     }
     return programNode;
 }
-
-AstNode* stmtNode() {
-    AstNode* stmtNode = createNode(nodeStmt);
-    if (!stmtNode) {
-        fprintf(stderr, "@ Error: Failed to create statement node.\n");
-        exit(EXIT_FAILURE);
-    }
-    // parsing statement
-    switch (pCurrentTkn().type) {
-        case TknIdentifier:
-            pAssOrFuncCall();
-            break;
-        case TknReturn:
-            pNextToken();
-            stmtNode -> data.stmt.returnExpr = pExpression();
-            break;
-        case TknPrint:
-            pNextToken();
-            stmtNode -> data.stmt.printExpr = pExpression();
-            break;
-        case TknTab:
-            pNextToken();
-            stmtNode -> data.stmt.stmt = stmtNode();
-            break;
-        default:
-            printf("! SYNTAX ERROR: Unexpected token in statement. Valid statement starting arguments include an identifier, 'print' or 'return'. \n");
-            exit(1);
-    }
-}
-
-AstNode* expNode(AstNode* term) {
-    AstNode* expNode = createNode(nodeTerm);
-    if (!expNode) {
-        fprintf(stderr, "@ Error: Failed to create expression node.\n");
-        exit(EXIT_FAILURE);
-    }
-
-    // parsing
-
-}
-
 // ###################################### PARSING END ######################################
 
 // ###################################### TRANSLATION TO C START ######################################
