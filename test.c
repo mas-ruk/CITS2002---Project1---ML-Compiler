@@ -195,141 +195,152 @@ int lineCount(FILE *file) {
     return count;
 }
 
-// lexer function to convert code to token list
 void tokenize(const char *code) {
-    const char *pointer = code;
-    int IndentLevel = 0;
+    const char *pointer = code; // accesses character in code
+    int IndentLevel = 0; // integer to track indent level
 
     while (*pointer) {
+
+        // check for comments first (to remove them from consideration and avoid errors later on)
         if (*pointer == '#') {
+
+            // skip everything until the newline character
             while (*pointer && *pointer != '\n') {
                 pointer++;
             }
-            continue;
-        }
+            continue;  // skip until newline, negating whole comment line from tokens array
+            }
 
-        if (isspace(*pointer)) {
-            if (*pointer == '\t') {
-                char TempBuffer[100];
-                sprintf(TempBuffer, "TAB%d", IndentLevel++);
-                addToken(TknTab, TempBuffer);
-            } else if (*pointer == '\n') {
-                addToken(TknNewline, "\n");
+        // check for blank spaces such as tab and newline
+        if (isspace(*pointer)) { 
+            if (*pointer == '\t') { // if tab exists
+                char TempBuffer[100]; // creates buffer to store characters, size should not exceed 100
+                sprintf(TempBuffer, "TAB%d", IndentLevel++); // string creation of value for tab token
+                addToken(TknTab, TempBuffer); // adds buffer as token
+            } 
+            else if (*pointer == '\n') { //if newline exists
+                addToken(TknNewline, "\n"); 
                 IndentLevel = 0;
             }
-            pointer++;
+            pointer++; // loops if ' ' appears
             continue;
-        }
-
-        // Number handling
-        if (isdigit(*pointer)) {
-            char TempBuffer[100] = {0};
-            int i = 0;
-            bool hasDecimalPoint = false;
-
-            while (isdigit(*pointer)) {
-                TempBuffer[i++] = *pointer++;
             }
 
-            if (*pointer == '.') {
+        // check for numbers (real constant values)
+        else if (isdigit(*pointer)) { // if integer number or float (aka. realconstant) exists
+            char TempBuffer[100] = {0}; // intialises all characters in buffer to 0 
+            int i = 0; // iterator 
+            bool hasDecimalPoint = false; // needed for syntax error checking
+            
+            while (isdigit(*pointer)) { // increment and extract digits before decimal point
+                 TempBuffer[i++] = *pointer++; // 
+            }
+
+            if (*pointer == '.') { // handle floats
+                if (hasDecimalPoint) { // check for if multiple decimal points exist
+                    fprintf(stderr, "! Syntax Error: Multiple decimal points in number.\n Recommendation: Check all numbers for incorrect format.\n");
+                    exit(1);
+                }
+
                 hasDecimalPoint = true;
-                TempBuffer[i++] = *pointer++;
-                while (isdigit(*pointer)) {
+                TempBuffer[i++] = *pointer++; // decimal point added 
+
+                while (isdigit(*pointer)) { // increment and extract digits after decimal point
                     TempBuffer[i++] = *pointer++;
                 }
-            }
+                
+                addToken(TknFloat, TempBuffer); // if float exists
 
-            TempBuffer[i] = '\0'; // Ensure null-termination
-
-            if (hasDecimalPoint) {
-                addToken(TknFloat, TempBuffer);
-            } else {
+            } else { // if number exists
                 addToken(TknNumber, TempBuffer);
             }
 
-            // Check next character after number
-            if (!isspace(*pointer) && !strchr("+-*/()&,", *pointer) && *pointer != '\0') {
-                fprintf(stderr, "! Syntax Error: Invalid character '%c' after number.\n", *pointer);
-                return; // or exit
-            }
-            continue;
-        }
-
-        if (isalpha(*pointer) && islower(*pointer)) {
-        char TempBuffer[100] = {0};
-        int i = 0;
-
-        // Extract the identifier or reserved word
-        while (isalnum(*pointer) || *pointer == '_') {
-            if (i < sizeof(TempBuffer) - 1) {
-                TempBuffer[i++] = *pointer++;
-            } else {
-                fprintf(stderr, "! Syntax Error: Identifier too long.\n");
+            /* check for invalid characters after the number
+            if (!isdigit(*pointer)) {
+                fprintf(stderr, "! Syntax Error: Invalid character '%c' after number.\n Recommendation: Check all numbers for invalid characters. Ensure all operators, identifiers, constants and words are properly seperated by spaces. \n", *pointer);
                 exit(1);
             }
-        }
-        TempBuffer[i] = '\0'; // Null-terminate the string
+            */
 
-        // Check against reserved words first
-        if (strcmp(TempBuffer, "function") == 0) {
-            addToken(TknFunction, TempBuffer);
-        } else if (strcmp(TempBuffer, "print") == 0) {
-            addToken(TknPrint, TempBuffer);
-        } else if (strcmp(TempBuffer, "return") == 0) {
-            addToken(TknReturn, TempBuffer);
-        } else if (isValidIdentifier(TempBuffer)) {
-            addToken(TknIdentifier, TempBuffer);
-        } else {
-            fprintf(stderr, "! Syntax Error: Invalid identifier.\n");
-            exit(1); // Terminate on error
-        }
-        return; // Ensures we exit this check to prevent further processing
-    }
+            // I think this may be the better way of checking for invalid characters after a number,
+            // bc in ml its acceptable to find whitespaces after tokens -- but just double check LMAO
 
-        // Mathematical operators
-        if (strchr("+-*/(),", *pointer)) {
-            char TempBuffer[2] = {*pointer, '\0'};
-            TknType type;
-            switch (*pointer) {
-                case '+':
-                case '-':
-                    type = TknTermOperator;
-                    break;
-                case '*':
-                case '/':
-                    type = TknFactorOperator;
-                    break;
-                case '(':
-                    type = TknLBracket;
-                    break;
-                case ')':
-                    type = TknRBracket;
-                    break;
-                case ',':
-                    type = TknComma;
-                    break;
-                default:
-                    fprintf(stderr, "! Syntax Error: Illegal character '%c'.\n", *pointer);
-                    return; // or exit
+            if (!isspace(*pointer) && *pointer != '+' && *pointer != '-' && *pointer != '*' && *pointer != '/' && 
+            *pointer != '(' && *pointer != ')' && *pointer != ',' && *pointer != '\0') {
+                fprintf(stderr, "! Syntax Error: Invalid character '%c' after number.\nRecommendation: Ensure that numbers are followed by operators, spaces, or valid symbols.\n", *pointer);
+                exit(1);
             }
-            addToken(type, TempBuffer);
-            pointer++;
-            continue;
+
         }
 
-        // Assignment operator
-        if (*pointer == '<' && *(pointer + 1) == '-') {
+        // check for strings (identifiers or reserved words)
+        else if (isalpha(*pointer) && islower(*pointer)) { // alphabetical lower case only
+            char TempBuffer[100] = {0};
+            int i = 0;
+            while (isalnum(*pointer)|| *pointer == '_') { // more general isalnum() allows for us to pass invalid strings into identifier checker, meaning that this specific error can be accurately flagged
+            TempBuffer[i++] = *pointer++; } 
+            TempBuffer[i] = '\0'; // Null-terminate the buffer
+
+            if (strcmp(TempBuffer, "function") == 0) { // if function keyword exists
+                addToken(TknFunction, TempBuffer);
+            }
+            else if (strcmp(TempBuffer, "print") == 0) { // if print keyword exists
+                addToken(TknPrint, TempBuffer);
+            } 
+            else if (strcmp(TempBuffer, "return") == 0) { // if return keyword exists
+                addToken(TknReturn, TempBuffer);
+            }
+            else if (isValidIdentifier(TempBuffer)) { // if valid identifier exists 
+                addToken(TknIdentifier, TempBuffer);
+            } 
+            else { // if invalid string exists
+                fprintf(stderr, "! Syntax Error: Invalid characters in identifier or string.\n Recommendation: Ensure all characters are lower case. Identifiers should be alphabetical only and between 1 and 12 characters long. \n");
+                exit(1);
+            }
+            continue;
+            }             
+
+        // check for mathematical operators
+        else if (*pointer == '+' || *pointer == '-' || *pointer == '*' || *pointer == '/' || *pointer == '(' || *pointer == ')'|| *pointer == ',') { // if valid character
+            char TempBuffer[2] = {*pointer, '\0'};
+            TknType TknType;
+                switch (*pointer) {
+                    case '+':
+                    case '-':
+                        TknType = TknTermOperator;  // if '+' and '-' (term operators) exists
+                        break;
+                    case '*':
+                    case '/':
+                        TknType = TknFactorOperator;  // if '*' and '/' (factor operators) exists
+                        break;
+                    case '(':
+                        TknType = TknLBracket;
+                        break;
+                    case ')':
+                        TknType = TknRBracket;  // if '(' and ')' (brackets) exists
+                        break;
+                    case ',':
+                        TknType = TknComma;  // if ',' (comma) exists
+                        break;
+        } 
+        
+        // was missing addToken after each case, so added here
+        addToken(TknType, TempBuffer);
+        pointer++;
+
+        // check for assignment operator
+        } else if (*pointer == '<' && *(pointer + 1) == '-') { // if "<-" operator exists
             addToken(TknAssignmentOperator, "<-");
             pointer += 2;
-            continue;
         }
 
-        // All other characters
-        fprintf(stderr, "! Syntax Error: Illegal character '%c'.\n", *pointer);
-        return; // or exit
+        // check for all other characters
+        else { 
+            fprintf(stderr, "! Syntax Error: Illegal character '%c' exists in file.\n Recommendation: remove invalid symbols and all uppercase to fix. \n", *pointer); // just added what character its throwing an error for 
+            exit(1);
+        }
     }
 }
-
 
 // function to read contents of a .ml file
 int readFile(const char *filename) {
@@ -786,11 +797,13 @@ AstNode* pProgram() {
 
 // ------------------- TESTING -------------------
 
-const char *testCode = 
-    "function myFunction() {\n"
-    "    print 123;\n"
-    "    return 456.78;\n"
-    "}\n";
+const char* testCode = 
+"# 18 is printed\n"
+"\n"
+"function printsum a b\n"
+"    print a + b\n"
+"#\n"
+"printsum (12, 6)";
 
 void testLexer() {
     printf("Testing Lexer:\n");
