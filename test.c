@@ -340,6 +340,8 @@ void tokenize(const char *code) {
             exit(1);
         }
     }
+  // At the end of input, add an end token
+    addToken(TknEnd, ""); // Add end token when reaching the end of the code
 }
 
 // function to read contents of a .ml file
@@ -478,11 +480,11 @@ AstNode* pFactor() {
             factorNode = createNode(nodeFactor);
             factorNode -> data.factor.identifier = strdup(pCurrentTkn().value);
             pMoveToNextTkn();
-                if (pCurrentTkn().type != TknNewline && pCurrentTkn().type != TknEnd) {
-                printf ("! SYNTAX ERROR: Expected new line after non-function name identifier\n.");
-                exit(1);
-                }
-            }
+            //if (pCurrentTkn().type != TknNewline && pCurrentTkn().type != TknEnd) {
+            //    printf ("! SYNTAX ERROR: Expected new line after non-function name identifier\n.");
+            //    exit(1);
+            //}
+        }
     } else if (pCurrentTkn().type == TknLBracket) {
         pMoveToNextTkn();
         factorNode = createNode(nodeFactor);
@@ -537,6 +539,8 @@ AstNode* pFuncCall() {
     // Consume (EDIT: STORE) the function name
     funcCallNode -> data.funcCall.identifier = strdup(Tokens[pCurrentTknIndex - 1].value);
 
+    printf("Token currently: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
+    
     // throwing errors so lets do some malloc bullcrap
     funcCallNode -> data.funcCall.args = malloc(sizeof(AstNode*) * MAX_ARGS);
     funcCallNode -> data.funcCall.argCount = 0;
@@ -544,36 +548,36 @@ AstNode* pFuncCall() {
     // Check for the left bracket
     if (pCurrentTkn().type == TknLBracket) {
         pMoveToNextTkn();  // Consume '('
-        
-        // parse parameters
-        if (pCurrentTkn().type != TknRBracket) {
-            // Parse the first expression or parameter
-            AstNode* paramNode = pExpression();
-            // ok this is a hell of a line but basically what this is doing
-            // is it accesses the funcCallNode that we've created 
-            // and then puts in the paramNode at the index identified by argCount as far as i can tell lmao
-            // cross fingers it works LMAO
-            funcCallNode -> data.funcCall.args[funcCallNode -> data.funcCall.argCount++] = paramNode;
-
-            // Check for additional parameters separated by commas
-            while (pCurrentTkn().type == TknComma) {
-                pMoveToNextTkn();  // Consume ','
-                AstNode* paramNode = pExpression(); // Parse the next parameter
-                funcCallNode -> data.funcCall.args[funcCallNode -> data.funcCall.argCount++] = paramNode;
-            }
-        }
-        
-        // Check for the right parenthesis ')'
-        if (pCurrentTkn().type != TknRBracket) {
-            printf("! SYNTAX ERROR: Expected ')' after function parameters.\n");
-            exit(1);
-        }
-        pMoveToNextTkn();  // Consume ')'
-    } 
+    }
     else {
         printf("! SYNTAX ERROR: Expected '(' after functioncall.\n");
         exit(1);
     }
+    // parse parameters
+    if (pCurrentTkn().type != TknRBracket) {
+        // Parse the first expression or parameter
+        AstNode* paramNode = pExpression();
+        // ok this is a hell of a line but basically what this is doing
+        // is it accesses the funcCallNode that we've created 
+        // and then puts in the paramNode at the index identified by argCount as far as i can tell lmao
+        // cross fingers it works LMAO
+        funcCallNode -> data.funcCall.args[funcCallNode -> data.funcCall.argCount++] = paramNode;
+
+        // Check for additional parameters separated by commas
+        while (pCurrentTkn().type == TknComma) {
+            pMoveToNextTkn();  // Consume ','
+            AstNode* paramNode = pExpression(); // Parse the next parameter
+            funcCallNode -> data.funcCall.args[funcCallNode -> data.funcCall.argCount++] = paramNode;
+        }
+    }
+        
+    // Check for the right parenthesis ')'
+    if (pCurrentTkn().type != TknRBracket) {
+        printf("! SYNTAX ERROR: Expected ')' after function parameters.\n");
+        exit(1);
+    }
+    pMoveToNextTkn();  // Consume ')'} 
+
     return funcCallNode;
 }
 
@@ -662,45 +666,22 @@ AstNode* pFuncDef() {
         funcDefNode->data.funcDef.paramCount = 0; // initalise to 0
         pMoveToNextTkn();
             
-        // Expecting open bracket
-        if (pCurrentTkn().type == TknLBracket) {
-            pMoveToNextTkn(); // move past (
-            
-            while (1) {
-                if (pCurrentTkn().type == TknIdentifier) {
-                    if (funcDefNode -> data.funcDef.paramCount >= MAX_PARAMS) {
-                        printf("! SYNTAX ERROR: Too many params in func def, maximum allowed is %d.\n", MAX_PARAMS);
-                        exit(EXIT_FAILURE);
-                    }
-
-                // add identifier to list of parameters
-                funcDefNode->data.funcDef.params[funcDefNode->data.funcDef.paramCount++] = strdup(pCurrentTkn().value);
-                pMoveToNextTkn();  
-                    
-                    if (pCurrentTkn().type == TknComma) { // expect comma
-                        pMoveToNextTkn();
-                    }
-                    else if (pCurrentTkn().type == TknRBracket) {
-                        pMoveToNextTkn(); // function parameter list ends 
-                        break; // continues after while loop broken
-                    } 
-                    else {
-                        printf("! SYNTAX ERROR: Expected ',' or ')' after function argument\n");
-                        exit(EXIT_FAILURE);
-                    }  
-                } 
-                else {
-                    // Handle unexpected tokens
-                    printf("! SYNTAX ERROR: Expected identifier for function parameter, but got '%s'\n", pCurrentTkn().value);
-                    exit(EXIT_FAILURE);
-                }
+        while (pCurrentTkn().type == TknIdentifier) {
+            if (funcDefNode -> data.funcDef.paramCount >= MAX_PARAMS) {
+                printf("! SYNTAX ERROR: Too many params in func def, maximum allowed is %d.\n", MAX_PARAMS);
+                exit(EXIT_FAILURE);
             }
-        } 
-        else if (pCurrentTkn().type == TknNewline) {
+
+            // add identifier to list of parameters
+            funcDefNode->data.funcDef.params[funcDefNode->data.funcDef.paramCount++] = strdup(pCurrentTkn().value);
+            pMoveToNextTkn();  
+        }
+        
+        if (pCurrentTkn().type == TknNewline) {
             // valid function with no parameters do nothing
         } 
         else {
-            printf("! SYNTAX ERROR: Expected newline for empty function after function parameters\n");
+            printf("! SYNTAX ERROR: Expected newline or identifier after function name\n");
             exit(EXIT_FAILURE);
         }
 
@@ -754,12 +735,10 @@ AstNode* pProgItem() {
 
         // Expect newline or end after each statement
         if (pCurrentTkn().type == TknNewline) {
-            pMoveToNextTkn();  // Consume newline or end
             return stmtNode;
         } else if (pCurrentTkn().type == TknEnd) {
             return stmtNode;  
-        } 
-        else {
+        } else {
             printf("! SYNTAX ERROR: Expected newline or end after statement, got '%s'.\n", pCurrentTkn().value);
             exit(EXIT_FAILURE);
         }
@@ -774,7 +753,7 @@ AstNode* pProgItem() {
     }
 }
 
-#define MAX_LINES 1000
+#define MAX_LINES 10000
 AstNode* pProgram() {
     AstNode* programNode = createNode(nodeProgram);
     
@@ -796,14 +775,13 @@ AstNode* pProgram() {
                 exit(EXIT_FAILURE);
             }
         }
-        pMoveToNextTkn();
     }
     return programNode;
 }
 
 // ------------------- TESTING ------------------- //
 
-const char* testCode = "print 5\n";
+const char* testCode = "function printsum a b\nprint a + b\n#\nprintsum (12, 6)\n";
 
 const char* additionalTests[] = {
     "function noParams\n    return 0\n#",
