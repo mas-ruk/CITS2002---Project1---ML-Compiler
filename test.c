@@ -539,6 +539,8 @@ AstNode* pFuncCall() {
     // Consume (EDIT: STORE) the function name
     funcCallNode -> data.funcCall.identifier = strdup(Tokens[pCurrentTknIndex - 1].value);
 
+    pMoveToNextTkn(); // function identifier eaten
+
     printf("Token currently: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
     
     // throwing errors so lets do some malloc bullcrap
@@ -778,6 +780,9 @@ AstNode* pProgram() {
     }
     return programNode;
 }
+
+// ------------- INTERPRETER------------- //
+
 
 // ------------------- TESTING ------------------- //
 
