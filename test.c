@@ -738,6 +738,8 @@ AstNode* pProgItem() {
         pMoveToNextTkn();
     }
 
+    printf("Current Token: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
+
     // check for if function definition exists
     if (pCurrentTkn().type == TknFunction) {
         return pFuncDef();
@@ -795,15 +797,22 @@ AstNode* pProgram() {
     return programNode;
 }
 
-// ------------------- TESTING -------------------
+// ------------------- TESTING ------------------- //
 
-const char* testCode = 
-"# 18 is printed\n"
-"\n"
-"function printsum a b\n"
-"    print a + b\n"
-"#\n"
-"printsum (12, 6)";
+const char* testCode = "print 5\n";
+
+const char* additionalTests[] = {
+    "function noParams\n    return 0\n#",
+    "function singleParam x\n    return x + 1\n#",
+    "function multipleParams x, y\n    return x + y\n#",
+    "function invalidParam 1a\n    return 0\n#", // Invalid identifier
+    "one <- 1\nprint one\n#", // Simple assignment and print
+    "function nestedFunc\n    return increment(2)\n#\nprint nestedFunc()\n#", // Nested function calls
+    "function withReturn x\n    return (x + 1)\n#",
+    "function emptyFunc\n#",
+    "function paramError x, y, \n#",
+    "function repeatName x\n    return x\nfunction repeatName x\n    return x + 1\n#" // Duplicate function name
+};
 
 void testLexer() {
     printf("Testing Lexer:\n");
@@ -818,8 +827,8 @@ void testLexer() {
 }
 
 void runTest(const char* testCode) {
-    // Set up your tokenizer with the test code here
-    // Tokenize the input, store in `Tokens`, reset `pCurrentTknIndex`, etc.
+    tokenize(testCode);
+    pCurrentTknIndex = 0;
 
     AstNode* result = pProgram(); // Run the parser
     if (result != NULL) {
@@ -841,6 +850,8 @@ void parseFile(const char* filename) {
 }
 
 int main() {
-    testLexer();
+
+    runTest(testCode);
+
     return 0;
 }
