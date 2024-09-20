@@ -26,7 +26,6 @@ typedef enum {
     TknFunction, // "function"
     TknPrint, // "print"
     TknReturn, // "return"
-    TknComment, // "#"
     TknNewline, // "\n" 
     TknTab, // "TABx" where x is the number of tabs so far through perusal
     TknAssignmentOperator, // "<-"
@@ -65,15 +64,40 @@ typedef struct AstNode {
     union {
         // to account for lines/statements in program we need to create an overarching program node
         struct {
-            struct AstNode **statements; // holds all statements in program
+            struct AstNode **programItems; // holds all statements in program
             int lineCount;
         } program;
+
+                // func def node
+        struct {
+            char *identifier;
+            char** params; // array of parameter names
+            int paramCount;
+            struct AstNode **stmt; // array of statment nodes
+            int stmtCount;
+        } funcDef;
         
         // statement node
         struct {
-            struct AstNode *expression; // used in stmt
-            struct AstNode *functionCall; 
-            char *identifier; // print and assignment
+        NodeType type; // Add a type to differentiate between statement types
+            union {
+                struct {
+                    struct AstNode *exp; // For assignment statements
+                    char *identifier; // Variable name
+                } assignment;
+
+                struct {
+                    struct AstNode *exp; // For print statements
+                } print;
+
+                struct {
+                    struct AstNode *exp; // For return statements
+                } returnStmt;
+
+                struct {
+                    struct AstNode *functionCall; // For function calls
+                } funcCall;
+            } data;
         } stmt;
         
         // expression node
@@ -95,7 +119,7 @@ typedef struct AstNode {
             float constant; // using float as we only require 6 digits of precision
             char* identifier;
             struct AstNode *funcCall;
-            struct AstNode *subExp; // expressions in parentheses
+            struct AstNode *exp; // expressions in parentheses
         } factor;
 
         // func call node
@@ -104,15 +128,6 @@ typedef struct AstNode {
             struct AstNode **args;
             int argCount;
         } funcCall;
-        
-        // func def node
-        struct {
-            char *identifier;
-            struct AstNode **params;
-            int paramCount;
-            struct AstNode **body;
-            int stmtCount;
-        } funcDef;
         
         // assignment node
         struct {
@@ -128,7 +143,7 @@ typedef struct AstNode {
         // return
         struct {
             struct AstNode *exp;
-        } rtrn;
+        } returnStmt;
     } data;
 } AstNode;
 
@@ -193,7 +208,6 @@ void tokenize(const char *code) {
 
         // check for comments first (to remove them from consideration and avoid errors later on)
         if (*pointer == '#') {
-            addToken(TknComment, "#");  // 
 
             // skip everything until the newline character
             while (*pointer && *pointer != '\n') {
@@ -604,27 +618,6 @@ AstNode* pFuncCall() {
     return funcCallNode;
 }
 
-// NOTE: assuming all functions have unique identifiers and will not rewrite over the previous function
-// Parsing over assignment/function call
-void pAssOrFuncCall(){
-    //check for if function exists already
-    if (doesFunctionExist(pCurrentTkn().value)) { 
-        pFuncCall();
-    }
-    else {
-        pMoveToNextTkn();
-    // check for assignment existance
-        if (pCurrentTkn().type == TknAssignmentOperator) {
-            pMoveToNextTkn();
-            pExpression(); // Parse right hand side of expression
-        }
-        else {
-        printf("! SYNTAX ERROR: Expected assignment operator '<-' after non-function name identifier.\n") ;
-        exit(1);
-        }
-    }
-}
-
 // parsing over statements
 AstNode* pStmt(){
     // turning the below into a switch case to consolidate
@@ -659,28 +652,34 @@ AstNode* pStmt(){
         case TknIdentifier:
             if (doesFunctionExist(pCurrentTkn().value)) {
                 // function call
-                stmtNode -> type = nodeFunctionCall;
-                stmtNode -> data.funcCall.identifier = strdup(pCurrentTkn().value);
-                // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NEEDS FIXING
-                stmtNode -> data.funcCall = pFuncCall();
+                stmtNode->data.funcCall.functionCall = pFuncCall();
+                stmtNode->type = nodeFunctionCall;
             } else {
                 // assignment
-                pMoveToNextTkn();
-                stmtNode -> type = nodeAssignment;
-                stmtNode -> data.assignment.identifier = strdup(pCurrentTkn().value);
-                pMoveToNextTkn(); // eat <-
-                stmtNode -> data.assignment.exp = pExpression();
+                stmtNode -> data.assignment.identifier = strdup(pCurrentTkn().value); // store identifier
+                pMoveToNextTkn(); // move to next token
+
+                //check assignment operator correctly exists here
+                if (pCurrentTkn().type == TknAssignmentOperator){
+                    pMoveToNextTkn(); // consume the assignment operator
+                    stmtNode -> type = nodeAssignment;
+                    stmtNode -> data.assignment.exp = pExpression(); // parse RHS of expression
+                }
+                else {
+                printf("! SYNTAX ERROR: Expected assignment operator '<-' after non-function name identifier.\n") ;
+                exit(1);
+                }     
             }
             break;
         case TknPrint:
             pMoveToNextTkn(); // eat print nom nom nom 
-            stmtNode -> type = nodePrint;
-            stmtNode -> data.print.exp = pExpression();
+            stmtNode->data.print.exp = pExpression();
+            stmtNode->type = nodePrint;
             break;
         case TknReturn:
             pMoveToNextToken();
-            stmtNode -> type = nodeReturn;
-            stmtNode -> data.rtrn.exp = pExpression();
+            stmtNode->data.returnStmt.exp = pExpression();
+            stmtNode->type = nodeReturn;
             break;
         default:
             // error rip
@@ -691,62 +690,99 @@ AstNode* pStmt(){
 
 // parsing over a function definition
 AstNode* pFuncDef() {
-        pMoveToNextTkn();  // Go to next token
-        if (pCurrentTkn().type == TknIdentifier) {
-            if (doesFunctionExist(pCurrentTkn().value)) {  // check for if function already exists
-                printf("! SYNTAX ERROR: Function name '%s' already definied\n", pCurrentTkn().value);
-                exit(1);
-            }
-            addFunctionName(pCurrentTkn().value); // Store function name
-            pMoveToNextTkn();
+    AstNode* funcDefNode = createNode(nodeFuncDef);
+    pMoveToNextTkn();  // Go to next token
+    if (pCurrentTkn().type == TknIdentifier) {
+        if (doesFunctionExist(pCurrentTkn().value)) {  // check for if function already exists
+            printf("! SYNTAX ERROR: Function name '%s' already definied\n", pCurrentTkn().value);
+            exit(1);
+        }
+        addFunctionName(pCurrentTkn().value); // Store function name
+        funcDefNode->data.funcDef.identifier = strdup(pCurrentTkn().value); // Function name
+        pMoveToNextTkn();
             
             // Expecting open bracket
             if (pCurrentTkn().type == TknLBracket) {
                 pMoveToNextTkn();  
-
-                //check for closing bracket (empty parameter lsit)
-                if (pCurrentTkn().type == TknRBracket) { // expect closed bracket
-                    pMoveToNextTkn();  // void function exists here
-                } else {
+                funcDefNode->data.funcDef.paramCount = 0; // initalise to 0
+                funcDefNode->data.funcDef.params = (char**)malloc(sizeof(char*) * MAX_PARAMS); // CHECK THIS PLEASE
+         
                 // loop through function parameters (Id, comma, Id, comma...)
                 while (pCurrentTkn().type == TknIdentifier) {
+
+                     // add identifier to list of parameters
+                    funcDefNode->data.funcDef.params[funcDefNode->data.funcDef.paramCount++] = strdup(pCurrentTkn().value);
                     pMoveToNextTkn();  
                     
                     if (pCurrentTkn().type == TknComma) { // expect comma
-                        pMoveToNextTkn(); 
-                        if (pCurrentTkn().type != TknIdentifier) { // if non identifier appears
-                        printf("! SYNTAX ERROR: Expected identifier after ',' in function argument\n");
-                        exit(1);
-                        }
+                        pMoveToNextTkn();
                     }
                     else if (pCurrentTkn().type == TknRBracket) {
                         pMoveToNextTkn(); // function parameter list ends 
-                            if (pCurrentTkn().type == TknNewline) {
-                                pMoveToNextTkn();
-                                pStmt(); // run stmt for next lines
-                                return;
-                            }
-                            else {
-                                printf("! SYNTAX ERROR: Expected newline after function argument closed aka. ')' \n");
-                                exit(1);
-                            }
-                    } else {
+                        break;
+                    } 
+                    else {
                         printf("! SYNTAX ERROR: Expected ',' or ')' after function argument\n");
                         exit(1);
-                    }
-                        
-            } 
-                printf("! SYNTAX ERROR: Expected ')' after function argument\n");
+                    } 
+                }
+                
+                if (pCurrentTkn().type != TknRBracket) {
+                printf("! SYNTAX ERROR: Expected ')' after function parameters\n");
                 exit(1);
-        }
-        } else {
+            }
+        } 
+        else {
             printf("! SYNTAX ERROR: Expected '(' after function name\n");
             exit(1);
         }
-    } 
-    else {
+        
+        // After parameters, expect  newline
+        if (pCurrentTkn().type == TknNewline) {
+            pMoveToNextTkn();
+        } else {
+            printf("! SYNTAX ERROR: Expected newline after function parameters\n");
+            exit(1);
+        }
+
+        // Parse the function body (statements)
+        funcDefNode->data.funcDef.stmtCount = 0;
+        funcDefNode->data.funcDef.stmt = (AstNode**)malloc(sizeof(AstNode*) * MAX_STATEMENTS); // CHECK THIS PLEASE
+
+        while (pCurrentTkn().type == TknTab) { // Expecting indented statements
+            if (funcDefNode->data.funcDef.stmtCount < MAX_STATEMENTS) {
+                funcDefNode->data.funcDef.stmt[funcDefNode->data.funcDef.stmtCount++] = pStmt(); // Parse statement
+            } else {
+                printf("@ Error: Too many statements in function body. Maximum is %d.\n", MAX_STATEMENTS);
+                exit(EXIT_FAILURE);
+            }
+
+            if (pCurrentTkn().type == TknNewline) {
+                pMoveToNextTkn(); // Move to next line
+            } else if (pCurrentTkn().type != TknTab) {
+                break; // Exit loop if not indented anymore
+            }
+        }
+    } else {
         printf("! SYNTAX ERROR: Expected identifier for function name\n");
         exit(1);
+    }
+
+    return funcDefNode; // Return the created function definition node
+}
+
+    
+
+AstNode* pProgItem() {
+    // handle newlines (skip and continue)
+    while (pCurrentTkn().type == TknNewline) {
+        pMoveToNextTkn();
+    }
+    // check for if function definition exists
+    if (pCurrentTkn().type == TknFunction) {
+        return pFuncDef();
+    } else {
+        return pStmt();
     }
 }
 
@@ -755,12 +791,13 @@ AstNode* pProgram() {
     
     // line count
     programNode -> data.program.lineCount = 0;
+    programNode->data.program.programItems = (AstNode**)malloc(sizeof(AstNode*) * MAX_LINES); // CHECK THIS PLEASE
 
     // parsing over program
     while (pCurrentTkn().type != TknEnd) {
-        AstNode* stmtNode = pStmt();
-        if (stmtNode != NULL) {
-            programNode -> data.program.statements[programNode->data.program.lineCount++] = stmtNode;
+        AstNode* programItem = pProgItem();
+        if (programItem != NULL) {
+            programNode -> data.program.statements[programNode->data.program.lineCount++] = programItem;
         }
         pMoveToNextTkn();
     }
