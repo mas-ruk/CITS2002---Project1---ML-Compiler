@@ -742,18 +742,29 @@ AstNode* pProgItem() {
     while (pCurrentTkn().type == TknNewline) {
         pMoveToNextTkn();
     }
-    
+
     // check for if function definition exists
     if (pCurrentTkn().type == TknFunction) {
         return pFuncDef();
     } else if (pCurrentTkn().type == TknIdentifier || pCurrentTkn().type == TknPrint || pCurrentTkn().type == TknReturn) {
-        return pStmt();
-    } else if (pCurrentTkn().type != TknEnd) {
+        AstNode* stmtNode = pStmt();
+        
+        // Expect newline or end after each statement
+        if (pCurrentTkn().type == TknNewline || pCurrentTkn().type == TknEnd) {
+            pMoveToNextTkn();  // Consume newline or end
+        } else {
+            printf("! SYNTAX ERROR: Expected newline or end after statement, got '%s'.\n", pCurrentTkn().value);
+            exit(EXIT_FAILURE);
+        }
+        return stmtNode;
+    } else if (pCurrentTkn().type == TknEnd) {
+        // End of program, no further tokens expected
+        return NULL;
+    } else {
         // handle unexpected tokens
-        printf("! SYNTAX ERROR: Unexpected token '%s'. Expected func definition or statement.\n", pCurrentTkn().value);
+        printf("! SYNTAX ERROR: Unexpected token '%s'. Expected function definition or statement.\n", pCurrentTkn().value);
         exit(EXIT_FAILURE);
     }
-    return NULL;
 }
 
 #define MAX_LINES 1000
@@ -807,7 +818,7 @@ void parseFile(const char* filename) {
 }
 
 int main() {
-    char filename[] = "testinput.ml";
+    char filename[] = "test.ml";
     parseFile(filename);
     return 0;
 }
