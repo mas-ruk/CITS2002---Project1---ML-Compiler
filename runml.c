@@ -851,31 +851,13 @@ AstNode* pProgram() {
 // ###################################### PARSING END ######################################
 
 // ###################################### TRANSLATION TO C START ######################################
-/*
-coming into the translation to the C section will be an AST
-i.e. for the assignment x <- 5 + 3, the AST would look like:
-Assignment("x", 
-    Operator(operAdd, 
-        Number(5), 
-        Number(3)
-    )
-)
 
-*/
 void writeCFile() {
     FILE *cFile = fopen("mlProgram.c", "w");
     if (cFile == NULL) {
         fprintf(stderr, "! Error: Could not create C file\n");
         return;
     }
-
-    // writing to C file
- //   fprintf(cFile, "#include <stdio.h>\n\n");
-  //  fprintf(cFile, "int main() {\n");
-  //  fprintf(cFile, "toC(cFile, root);");
-  //  fprintf(cFile, "    return 0;\n");
-   // fprintf(cFile, "}\n");
-
     fclose(cFile);
 }
 
@@ -966,7 +948,7 @@ void toC(AstNode* node) {
             }
             addToCodeBuffer("}\n");
             break;
-           
+        
         case nodeFuncDef:
             if (node->data.funcDef.isReturn ==1) {
                 addToCodeBuffer("int ")
@@ -989,7 +971,7 @@ void toC(AstNode* node) {
                         addToCodeBuffer(node->data.funcDef.params[i]);
                 }
             }
-           
+
             addToCodeBuffer(") {\n");
             for (int j = 0; j < node->data.funcDef.stmtCount; j++) {
                 toC(node->data.funcDef.stmt[j]);
@@ -1035,7 +1017,7 @@ void toC(AstNode* node) {
             toC(node->data.exp.rVar);
             break;
 
-         case nodeFunctionCall:
+        case nodeFunctionCall:
             addToCodeBuffer(node->data.stmt.data.functionCall.identifier);
             addToCodeBuffer(" (");
             for (int i = 0; i < node->data.stmt.data.functionCall.argCount; i++) {
@@ -1150,7 +1132,7 @@ void replaceAssiType(char* buffer) {
 }
 
 // ###################################### TRANSLATION TO C END ######################################
-// ###################################### RUNNING C PROGRAM ######################################
+// ###################################### RUNNING C PROGRAM START ######################################
 
 void compileAndRunInC() {
     system("gcc -o mlProgram mlProgram.c");
@@ -1163,7 +1145,7 @@ void cleanupAfterExec() {
     remove("mlProgram");
 }
 
-// ###################################### RUNNING C PROGRAM ######################################
+// ###################################### RUNNING C PROGRAM END ######################################
 
 int main(int argc, char *argv[]) {
     // error checking, if no. of args is less than 2 
@@ -1202,10 +1184,8 @@ int main(int argc, char *argv[]) {
     parser();
 
     // translation to C
-    toC(astRoot)
+    toC(astRoot);
 
-    
-    
     //final translation and running
     writeCFile();
     compileAndRunInC();
