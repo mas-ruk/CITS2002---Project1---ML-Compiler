@@ -680,7 +680,7 @@ AstNode* pStmt() {
                 exit(EXIT_FAILURE);
             }
             // Check if the expression or any term within it has an operator
-            stmtNode->data.print.hasOperator = containsOperator(stmtNode->data.print.exp);
+            stmtNode->data.stmt.data.print.hasOperator = containsOperator(stmtNode->data.stmt.data.print.exp);
             break;
 
         case TknReturn:
@@ -919,7 +919,6 @@ void freeBuffer() {
 
 // defining translation to rudimentaty C program
 void toC(AstNode* node) {
-    determineTypes(node); // Determine types before converting to C
 
     // first we gotta check if the node is existing
     if (!node) {
@@ -934,12 +933,12 @@ void toC(AstNode* node) {
            
             // First pass to collect global variable assignments
             for (int i = 0; i < node->data.program.lineCount; i++) {
-                if (node->data.program.programItems[i]->type == nodeAssignment && !functionDefined) {
+                if (node->data.program.programItems[i]->type == nodeAssignment && !functionDefined) { // CHECK THIS
                     // Handle global variable
                     addToCodeBuffer("AssiType "); // to do
-                    addToCodeBuffer(node->data.program.programItems[i]->data.assignment.identifier);
+                    addToCodeBuffer(node->data.program.programItems[i]->data.stmt.data.assignment.identifier);
                     addToCodeBuffer(" = ");
-                    toC(node->data.program.programItems[i]->data.assignment.exp);
+                    toC(node->data.program.programItems[i]->data.stmt.data.assignment.exp);
                     addToCodeBuffer(";\n");
                 } else if (node->data.program.programItems[i]->type == nodeFuncDef) {
                     functionDefined = true; // Mark that we've seen a function
@@ -953,11 +952,11 @@ void toC(AstNode* node) {
 
             // Process all statements that should be executed in main
             for (int j = 0; j < node->data.program.lineCount; j++) {
-                if (node->data.program.programItems[j]->type == nodePrint) {
+                if (node->data.program.programItems[j]->type == nodePrint) { // check this
                     toC(node->data.program.programItems[j]);
-                } else if (node->data.program.programItems[j]->type == nodeAssignment && functionDefined) {
+                } else if (node->data.program.programItems[j]->type == nodeAssignment && functionDefined) { //check this
                     toC(node->data.program.programItems[j]);
-                } else if (node->data.program.programItems[j]->type == nodeReturn) {
+                } else if (node->data.program.programItems[j]->type == nodeReturn) { // check this
                     toC(node->data.program.programItems[j]);
                     hasReturn = true;
                 }
@@ -1001,7 +1000,7 @@ void toC(AstNode* node) {
 
         case nodeAssignment:
             addToCodeBuffer("AssiType ");
-            addToCodeBuffer(node->data.assignment.identifier);
+            addToCodeBuffer(node->data.stmt.data.assignment.identifier);
             addToCodeBuffer("= ");
             toC(node->data.assignment.exp);
             addToCodeBuffer(";\n");
@@ -1010,10 +1009,10 @@ void toC(AstNode* node) {
         case nodePrint:
             addToCodeBuffer("printf(");
             
-            if (node->data.funcDef.hasOperator == 1) {
+            if (node->data.stmt.data.print.hasOperator == 1) {
                 addToCodeBuffer("%d\n ");
             }
-            else if (node->data.funcDef.hasOperator == 0) {
+            else if (node->data.stmt.data.print.hasOperator == 0) {
                 addToCodeBuffer("%f\n ");
             }
             else { 
@@ -1021,13 +1020,13 @@ void toC(AstNode* node) {
             exit(1);
             }
             addToCodeBuffer( " , ");
-            toC(node->data.print.exp);
+            toC(node->data..stmt.data.print.exp);
             addToCodeBuffer(");\n");
             break;
 
         case nodeReturn:
             addToCodeBuffer("return ");
-            toC(node->data.ret.exp);
+            toC(node->data.stmt.data.returnStmt.exp);
             addToCodeBuffer(";\n");
             break;
 
@@ -1038,13 +1037,13 @@ void toC(AstNode* node) {
             break;
 
          case nodeFunctionCall:
-            addToCodeBuffer(node->data.functionCall.identifier);
+            addToCodeBuffer(node->data.stmt.data.functionCall.identifier);
             addToCodeBuffer(" (");
-            for (int i = 0; i < node->data.functionCall.argCount; i++) {
+            for (int i = 0; i < node->data.stmt.data.functionCall.argCount; i++) {
                 if (i > 0) {
                     addToCodeBuffer(", ");
                 }
-                toC(node->data.functionCall.args[i]);
+                toC(node->data.stmt.data.functionCall.args[i]);
             }
             addToCodeBuffer(");\n");
             break;
@@ -1072,13 +1071,84 @@ void toC(AstNode* node) {
     }
 }
 
-//replaces assitype with correct int or float type
-void modifyOutputFile(buffer) {
-    // Rewind the file pointer to the beginning of the file
+//helper function
+bool hasOperatorInExpression(const char* expression) {
+    // Check for presence of operators in the expression string
+    return (strstr(expression, "+") || strstr(expression, "-") || 
+            strstr(expression, "*") || strstr(expression, "/"));
+}
 
 
-    /
+void replaceAssiType(char* buffer) {
+    //check assitype exists in buffer
+    if (!strstr(buffer, "AssiType")) {
+        return; // no replacements needed
+    }
     
+    char* pos = strstr(buffer, "AssiType"); //find where "AssiType" first appears
+    size_t bufferLength = strlen(buffer); // length of original buffer
+    
+    // create new buffer for modifed string
+    char* newBuffer = malloc(bufferLength + 1); // Check this
+    if (!newBuffer) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return;
+    }
+    
+    size_t newBufferIndex = 0;
+    char varName[50];
+    
+    // Iterate through the original buffer line by line
+    char* line = strtok(buffer, "\n");
+    while (line) {
+        char* linePos = line;
+        while ((pos = strstr(linePos, "AssiType"))) {
+            // get variable name
+            sscanf(pos, "AssiType %s", varName);
+
+            // check if the variable is used with an operator
+            bool isInt = false;
+            if (strstr(line, varName) && (strstr(line, "+") || strstr(line, "-") || strstr(line, "*") || strstr(line, "/"))) {
+                isInt = true;
+            }
+
+            // copy the part of the line before "AssiType" to the new buffer
+            strncpy(newBuffer + newBufferIndex, line, pos - line);
+            newBufferIndex += pos - line;
+
+            // Replace "assitype" with "int" or "float"
+            if (isInt) {
+                strcpy(newBuffer + newBufferIndex, "int ");
+            } else {
+                strcpy(newBuffer + newBufferIndex, "float ");
+            }
+            newBufferIndex += (isInt ? 4 : 6); // length of inserted stuff
+
+            // move past assitype in line
+            linePos = pos + strlen("AssiType");
+        }
+
+        // copy rest of line
+        if (linePos && *linePos) {
+            strcpy(newBuffer + newBufferIndex, linePos);
+            newBufferIndex += strlen(linePos);
+        }
+
+        // add newline if not last line
+        newBuffer[newBufferIndex++] = '\n';
+
+        // get next line
+        line = strtok(NULL, "\n");
+    }
+
+    // null terminate new generated buffer code
+    newBuffer[newBufferIndex] = '\0';
+
+    // copy new buffer back to og buffer
+    strcpy(buffer, newBuffer);
+
+    // Free (delete) new buffer
+    free(newBuffer);
 }
 
 // ###################################### TRANSLATION TO C END ######################################
