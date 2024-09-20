@@ -1,8 +1,3 @@
-//  CITS2002 Project 1 2024
-//  Student1:   23630652    Zac Doruk Maslen
-//  Student2:   24000895    Alexandra Mennie
-//  Platform:   Ubuntu Linux
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -347,7 +342,7 @@ void tokenize(const char *code) {
 }
 
 // function to read contents of a .ml file
-int readFile(char *filename) {
+int readFile(const char *filename) {
 
     // opening file for reading
     FILE *file = fopen(filename, "r");
@@ -395,47 +390,20 @@ int readFile(char *filename) {
 
 // ###################################### PARSING START ######################################
 
-/* 
-a parser organises tokens into a structured form based on the grammer of the language
-i.e. goes through the following steps: token organisation, 
-validation (if sequence of tokens forms valid constructs according to ml specs),
-and then generates syntax tree
-i.e. checks if an assignment is correct (i.e. x = 5 is valid but 5 = x is not)
-and then generates a syntax tree based on the valid constructs 
-*/
+// Compiler throwing hissy fit hence this
+char *strdup(const char *s) {
+    size_t len = strlen(s);
+    char *dup = malloc(len + 1);
+    if (dup) {
+        strcpy(dup, s);
+    }
+    return dup;
+}
 
-/*
-program:
-        ( program-item )*
-
-program-item:
-        statement
-        |  function identifier ( identifier )*
-        ←–tab–→ statement1
-        ←–tab–→ statement2
-        ....
-
-statement:
-        identifier "<-" expression
-        |  print  expression
-        |  return expression
-        |  functioncall
-
-expression:
-        term   [ ("+" | "-")  expression ]
-
-term:
-        factor [ ("*" | "/")  term ]
-
-factor:
-        realconstant
-        | identifier
-        | functioncall
-        | "(" expression ")"
-
-functioncall:
-        identifier "(" [ expression ( "," expression )* ] ")"
-*/
+// Prototype for the parser functions
+AstNode* pFuncCall();
+AstNode* pExpression();
+AstNode* pProgram();
 
 AstNode nodes[MAX_NODES]; // not using malloc, static allocation
 int pCurrentTknIndex = 0;
@@ -452,7 +420,7 @@ Token getNextTkn() {
 }
 
 // Increment token index
-Token pMoveToNextTkn() {
+void pMoveToNextTkn() {
     pCurrentTknIndex++;
 }
 
@@ -562,8 +530,7 @@ AstNode* pExpression(){
         AstNode* exprNode = createNode(nodeExpression);
         exprNode -> data.Expression.lVar = termNode; 
         exprNode -> data.Expression.oper = oper;
-
-        // may need to add exprNode->data.exp.rVar = rVarNode;
+        exprNode->data.Expression.rVar = rVarNode;
         return exprNode;
     } return termNode;
 }
@@ -770,13 +737,12 @@ AstNode* pFuncDef() {
     return funcDefNode; // Return the created function definition node
 }
 
-    
-
 AstNode* pProgItem() {
     // handle newlines (skip and continue)
     while (pCurrentTkn().type == TknNewline) {
         pMoveToNextTkn();
     }
+    
     // check for if function definition exists
     if (pCurrentTkn().type == TknFunction) {
         return pFuncDef();
@@ -816,247 +782,32 @@ AstNode* pProgram() {
     }
     return programNode;
 }
-// ###################################### PARSING END ######################################
 
-// ###################################### TRANSLATION TO C START ######################################
-/*
-coming into the translation to the C section will be an AST
-i.e. for the assignment x <- 5 + 3, the AST would look like:
-Assignment("x", 
-    Operator(operAdd, 
-        Number(5), 
-        Number(3)
-    )
-)
+void runTest(const char* testCode) {
+    // Set up your tokenizer with the test code here
+    // Tokenize the input, store in `Tokens`, reset `pCurrentTknIndex`, etc.
 
-*/
-void writeCFile() {
-    FILE *cFile = fopen("mlProgram.c", "w");
-    if (cFile == NULL) {
-        fprintf(stderr, "! Error: Could not create C file\n");
-        return;
+    AstNode* result = pProgram(); // Run the parser
+    if (result != NULL) {
+        printf("Test passed!\n");
+    } else {
+        printf("Test failed!\n");
     }
 
-    // writing to C file
- //   fprintf(cFile, "#include <stdio.h>\n\n");
-  //  fprintf(cFile, "int main() {\n");
-  //  fprintf(cFile, "toC(cFile, root);");
-  //  fprintf(cFile, "    return 0;\n");
-   // fprintf(cFile, "}\n");
-
-    fclose(cFile);
+    // Clean up memory, if necessary
 }
 
-//declare interpreter buffer size
-#define BUFFER_SIZE 2048 // may change
-
-char* codeBuffer; // Global buffer for C code
-int bufferLength = 0;
-
-// Initialize buffer
-void initBuffer() {
-    codeBuffer = malloc(BUFFER_SIZE); // CHECK THIS PLEASE
-    if (!codeBuffer) {
-        fprintf(stderr, "Memory allocation failed\n");
-        exit(1);
-    }
-    codeBuffer[0] = '\0'; // Start with an empty string
-}
-
-/// Append string to buffer
-void addToCodeBuffer(const char* str) {
-    int len = strlen(str);
-    if (bufferLength + len >= BUFFER_SIZE) {
-        // Resize buffer if necessary
-        char* newBuffer = realloc(codeBuffer, bufferLength + len + 1);
-        if (!newBuffer) {
-            fprintf(stderr, "Memory reallocation failed\n");
-            freeBuffer(); // Clean up existing buffer
-            exit(1);
-        }
-        codeBuffer = newBuffer;
-    }
-    strcat(codeBuffer, str);
-    bufferLength += len;
-}
-
-// Free the buffer
-void freeBuffer() {
-    free(codeBuffer);
-}
-
-// defining translation to rudimentaty C program
-void toC(AstNode* node) {
-    // first we gotta check if the node is existing
-    if (!node) {
-        return;
-    }
-    switch (node->type) {
-        case nodeProgram:
-            addToCodeBuffer("#include <stdio.h>\n\n");
-            for (int i = 0; i < node->data.program.lineCount; i++) {
-                toC(node->data.program.programItems[i], outFile);
-            }
-            break;
-        
-        case nodeFuncDef:
-            addToCodeBuffer("FuncType ");
-            addToCodeBuffer(node->data.funcDef.identifier);
-            addToCodeBuffer("(");
-            // check parameters exist 
-            if(node->data.funcDef.paramCount > 0) {
-                for (int i = 0; i < node->data.funcDef.paramCount; i++) {
-                    if (i > 0) fprintf(outFile, ", ");
-                    addToCodeBuffer("int ");
-                    addToCodeBuffer(node->data.funcDef.params[i]);
-                }
-            }
-            
-            addToCodeBuffer(") {\n");
-            for (int j = 0; j < node->data.funcDef.stmtCount; j++) {
-                toC(node->data.funcDef.stmt[j]);
-            }
-            addToCodeBuffer("}\n\n");
-            break;
-
-        case nodeAssignment:
-            addToCodeBuffer("AssiType ")
-            addToCodeBuffer(node->data.assignment.identifier);
-            addToCodeBuffer("= ")
-            toC(node->data.assignment.exp);
-            addToCodeBuffer(";\n");
-            break;
-
-        case nodePrint:
-            addToCodeBuffer("printf( PrinType , ");
-            toC(node->data.print.exp);
-            addToCodeBuffer(");\n");
-            break;
-
-        case nodeExpression:
-            toC(node->data.exp.lVar);
-            addToCodeBuffer(node->data.exp.oper);
-            toC(node->data.exp.rVar);
-            break;
-
-         case nodeFunctionCall:
-            addToCodeBuffer(node->data.functionCall.identifier);
-            addToCodeBuffer(" (");
-            for (int i = 0; i < node->data.functionCall.argCount; i++) {
-                if (i > 0) {
-                    addToCodeBuffer(", ");
-                }
-                toC(node->data.functionCall.args[i]);
-            }
-            addToCodeBuffer(")");
-            break;
-
-        case nodeFactor:
-            if (node->data.factor.identifier) { // identifier exists
-                addToCodeBuffer(node->data.factor.identifier);
-            } 
-            else if (node->data.factor.funcCall) { // else if function call exists
-            toC(node->data.factor.funcCall);
-            } 
-            else if (node->data.factor.exp) { // if expression exists
-                toC(node->data.factor.exp); 
-            } 
-            else { // otherwise treat as constant
-                char buffer[50]; // Adjust size as needed
-                snprintf(buffer, sizeof(buffer), "%.6f", node->data.factor.constant);
-                addToCodeBuffer(buffer);
-            }
-            break;
-
-        default:
-            // Handle error or unsupported node types
-            break;
+void parseFile(const char* filename) {
+    int result = readFile(filename);
+    if (result == 0) {
+        pProgram();
+        // Print the parsed program (optional)
+        // printProgram(program);
     }
 }
 
-void modifyOutputFile(FILE *outFile) {
-    // Rewind the file pointer to the beginning of the file
-
-    
-    rewind(outFile);
-    
-    // Read the content into memory (if necessary)
-    // This is optional; if you're making small edits, you might just want to write directly to the file.
-    // Use a buffer if needed for more complex modifications.
-    
-    // Example of adding additional content
-    fprintf(outFile, "// Additional generated code\n");
-    fprintf(outFile, "void extraFunction() {\n");
-    fprintf(outFile, "    // This function does something extra\n");
-    fprintf(outFile, "}\n");
-    
-    // Example of replacing text (simple example)
-    // You'll need to implement the logic to read and replace specific words in your output if desired.
-    
-    // If you read the content into memory, you would perform the replacements and then write it back
-}
-
-// ###################################### TRANSLATION TO C END ######################################
-// ###################################### RUNNING C PROGRAM ######################################
-
-void compileAndRunInC() {
-    system("gcc -o mlProgram mlProgram.c");
-    system("./mlProgram");
-}
-
-// function to remove created C file and exec file
-void cleanupAfterExec() {
-    remove("mlProgram.c");
-    remove("mlProgram");
-}
-
-// ###################################### RUNNING C PROGRAM ######################################
-
-int main(int argc, char *argv[]) {
-    // error checking, if no. of args is less than 2 
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s <filename.ml>\n", argv[0]); // changed to fprintf to print to stderr instead of default data stream
-        return 1;
-    }
-
-    // the name of the file is at initial argument provided
-    char *filename = argv[1];
-
-    // checks if file name is .ml
-    size_t length = strlen(filename); // unsigned datatype, good for storing str length 
-    if (length < 3 || strcmp(filename + length - 3, ".ml") != 0) {
-        fprintf(stderr, "! Error: File name must end with '.ml'\n");
-        return 1;
-    }
-
-    // read the file
-    int status = readFile(filename); // also doing tokenisation
-
-    if (status == -1) {
-        return 1;
-    }
-
-    // debugging tokens
-    printf("Tokens after tokenisation\n");
-    for (int i = 0; i < TknIndex; i++) {
-        print_token(Tokens[i]);
-    }
-
-    //initalise buffer
-    initBuffer();
-    
-    // parsing
-    parser();
-
-    // translation to C
-    toC(astRoot)
-
-    
-    
-    //final translation and running
-    writeCFile();
-    compileAndRunInC();
-    cleanupAfterExec();
-
+int main() {
+    char filename[] = "testinput.ml";
+    parseFile(filename);
     return 0;
 }
