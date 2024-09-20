@@ -749,9 +749,13 @@ AstNode* pProgItem() {
     || pCurrentTkn().type == TknReturn) {
         AstNode* stmtNode = pStmt();
         
+        // debugging
+        printf("Next Token after statement: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
+
         // Expect newline or end after each statement
         if (pCurrentTkn().type == TknNewline) {
             pMoveToNextTkn();  // Consume newline or end
+            return stmtNode;
         } else if (pCurrentTkn().type == TknEnd) {
             return stmtNode;  
         } 
