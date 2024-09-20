@@ -930,7 +930,6 @@ void toC(AstNode* node) {
 
             // Flag to check if funcdef exists
             bool functionDefined = false;
-           
             // First pass to collect global variable assignments
             for (int i = 0; i < node->data.program.lineCount; i++) {
                 if (node->data.program.programItems[i]->type == nodeAssignment && !functionDefined) { // CHECK THIS
@@ -1078,7 +1077,6 @@ bool hasOperatorInExpression(const char* expression) {
             strstr(expression, "*") || strstr(expression, "/"));
 }
 
-
 void replaceAssiType(char* buffer) {
     //check assitype exists in buffer
     if (!strstr(buffer, "AssiType")) {
@@ -1096,7 +1094,7 @@ void replaceAssiType(char* buffer) {
     }
     
     size_t newBufferIndex = 0;
-    char varName[50];
+    char varName[13]; // var name should only be 12 long -> so 12 + 1 for null character
     
     // Iterate through the original buffer line by line
     char* line = strtok(buffer, "\n");
@@ -1104,7 +1102,7 @@ void replaceAssiType(char* buffer) {
         char* linePos = line;
         while ((pos = strstr(linePos, "AssiType"))) {
             // get variable name
-            sscanf(pos, "AssiType %s", varName);
+            sscanf(pos, "AssiType %12s", varName);
 
             // check if the variable is used with an operator
             bool isInt = false;
