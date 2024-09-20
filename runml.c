@@ -465,8 +465,8 @@ int containsOperator(AstNode* node) {
 
     // Check if it's an expression
     if (node->type == nodeExpression) {
-        if (node->data.exp.oper != NULL) return 1; // Found operator
-        return containsOperator(node->data.exp.lVar) || containsOperator(node->data.exp.rVar);
+        if (node->data.Expression.oper != NULL) return 1; // Found operator
+        return containsOperator(node->data.Expression.lVar) || containsOperator(node->data.Expression.rVar);
     }
 
     // Check if it's a term
@@ -921,7 +921,7 @@ void toC(AstNode* node) {
                     addToCodeBuffer(" = ");
                     toC(node->data.program.programItems[i]->data.stmt.data.assignment.exp);
                     addToCodeBuffer(";\n");
-                } else if (node->data.program.programItems[i]->type == nodeFuncDef) {
+                } else if (node->data.program.programItems[i]->type == nodeFunctionDef) {
                     functionDefined = true; // Mark that we've seen a function
                     toC(node->data.program.programItems[i]); // Process function definitions
                 }
@@ -1012,9 +1012,9 @@ void toC(AstNode* node) {
             break;
 
         case nodeExpression:
-            toC(node->data.exp.lVar);
-            addToCodeBuffer(node->data.exp.oper);
-            toC(node->data.exp.rVar);
+            toC(node->data.Expression.lVar);
+            addToCodeBuffer(node->data.Expression.oper);
+            toC(node->data.Expression.rVar);
             break;
 
         case nodeFunctionCall:
