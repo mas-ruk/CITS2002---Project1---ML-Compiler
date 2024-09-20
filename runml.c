@@ -74,6 +74,7 @@ typedef struct AstNode {
             int paramCount;
             struct AstNode **stmt; // array of statment nodes
             int stmtCount;
+            int isReturn; // type checking 
         } funcDef;
         
         // statement node
@@ -87,6 +88,7 @@ typedef struct AstNode {
 
                 struct {
                     struct AstNode *exp; // For print statements
+                    int hasOperator; // for type checking
                 } print;
 
                 struct {
@@ -137,6 +139,7 @@ typedef struct AstNode {
         // print
         struct {
             struct AstNode *exp;
+            int hasOperator; // type checking
         } print;
         
         // return
@@ -456,6 +459,25 @@ Token pMoveToNextTkn() {
     pCurrentTknIndex++;
 }
 
+//helper function
+int containsOperator(AstNode* node) {
+    if (!node) return 0;
+
+    // Check if it's an expression
+    if (node->type == nodeExpression) {
+        if (node->data.exp.oper != NULL) return 1; // Found operator
+        return containsOperator(node->data.exp.lVar) || containsOperator(node->data.exp.rVar);
+    }
+
+    // Check if it's a term
+    if (node->type == nodeTerm) {
+        if (node->data.term.oper != NULL) return 1; // Found operator
+        return containsOperator(node->data.term.lVar) || containsOperator(node->data.term.rVar);
+    }
+
+    return 0; // No operator found
+}
+
 // add new node from token to tree
 AstNode* createNode(NodeType type){
     if (nodeCount < MAX_NODES) {
@@ -657,6 +679,8 @@ AstNode* pStmt() {
                 printf("! SYNTAX ERROR: Expected a valid expression after 'print'.\n");
                 exit(EXIT_FAILURE);
             }
+            // Check if the expression or any term within it has an operator
+            stmtNode->data.print.hasOperator = containsOperator(stmtNode->data.print.exp);
             break;
 
         case TknReturn:
@@ -745,10 +769,18 @@ AstNode* pFuncDef() {
         // Parse the function body (statements)
         funcDefNode->data.funcDef.stmt = (AstNode**)malloc(sizeof(AstNode*) * MAX_STATEMENTS); 
         funcDefNode->data.funcDef.stmtCount = 0;
+        int returnFound = 0; // Flag for return statement
 
         while (pCurrentTkn().type == TknTab) { // Expecting indented statements
             if (funcDefNode->data.funcDef.stmtCount < MAX_STATEMENTS) {
                 funcDefNode->data.funcDef.stmt[funcDefNode->data.funcDef.stmtCount++] = pStmt(); // Parse statement
+                
+                // check if this statement is a return statement
+                if (stmtNode->type == nodeReturn) {
+                    returnFound = 1; //set flag
+                }
+                funcDefNode->data.funcDef.isReturn = returnFound;
+            
             } else {
                 printf("@ Error: Too many statements in function body. Maximum is %d.\n", MAX_STATEMENTS);
                 exit(EXIT_FAILURE);
@@ -887,6 +919,8 @@ void freeBuffer() {
 
 // defining translation to rudimentaty C program
 void toC(AstNode* node) {
+    determineTypes(node); // Determine types before converting to C
+
     // first we gotta check if the node is existing
     if (!node) {
         return;
@@ -894,24 +928,70 @@ void toC(AstNode* node) {
     switch (node->type) {
         case nodeProgram:
             addToCodeBuffer("#include <stdio.h>\n\n");
+
+            // Flag to check if funcdef exists
+            bool functionDefined = false;
+           
+            // First pass to collect global variable assignments
             for (int i = 0; i < node->data.program.lineCount; i++) {
-                toC(node->data.program.programItems[i], outFile);
-            }
-            break;
-        
-        case nodeFuncDef:
-            addToCodeBuffer("FuncType ");
-            addToCodeBuffer(node->data.funcDef.identifier);
-            addToCodeBuffer("(");
-            // check parameters exist 
-            if(node->data.funcDef.paramCount > 0) {
-                for (int i = 0; i < node->data.funcDef.paramCount; i++) {
-                    if (i > 0) fprintf(outFile, ", ");
-                    addToCodeBuffer("int ");
-                    addToCodeBuffer(node->data.funcDef.params[i]);
+                if (node->data.program.programItems[i]->type == nodeAssignment && !functionDefined) {
+                    // Handle global variable
+                    addToCodeBuffer("AssiType "); // to do
+                    addToCodeBuffer(node->data.program.programItems[i]->data.assignment.identifier);
+                    addToCodeBuffer(" = ");
+                    toC(node->data.program.programItems[i]->data.assignment.exp);
+                    addToCodeBuffer(";\n");
+                } else if (node->data.program.programItems[i]->type == nodeFuncDef) {
+                    functionDefined = true; // Mark that we've seen a function
+                    toC(node->data.program.programItems[i]); // Process function definitions
                 }
             }
+
+            // after this add main functions
+            addToCodeBuffer("int main() {\n");
+            bool hasReturn = false; // flag to track if a return statement is made in main
+
+            // Process all statements that should be executed in main
+            for (int j = 0; j < node->data.program.lineCount; j++) {
+                if (node->data.program.programItems[j]->type == nodePrint) {
+                    toC(node->data.program.programItems[j]);
+                } else if (node->data.program.programItems[j]->type == nodeAssignment && functionDefined) {
+                    toC(node->data.program.programItems[j]);
+                } else if (node->data.program.programItems[j]->type == nodeReturn) {
+                    toC(node->data.program.programItems[j]);
+                    hasReturn = true;
+                }
+            }
+            // Only add return 0 if no return statement has been encountered
+            if (!hasReturn) {
+                addToCodeBuffer("    return 0;\n");
+            }
+            addToCodeBuffer("}\n");
+            break;
+           
+        case nodeFuncDef:
+            if (node->data.funcDef.isReturn ==1) {
+                addToCodeBuffer("int ")
+            }
+            else if (node->data.funcDef.isReturn == 0) {
+                addToCodeBuffer("void ")
+            }
+            else { 
+                fprintf(stderr, "IDK what the fuck happened here\n");
+            exit(1);
+            }
             
+            addToCodeBuffer(node->data.funcDef.identifier);
+            addToCodeBuffer("(");
+            // check parameters exist
+            if(node->data.funcDef.paramCount > 0) {
+                for (int i = 0; i < node->data.funcDef.paramCount; i++) {
+                    if (i > 0) addToCodeBuffer(", "); // need to change
+                        addToCodeBuffer("int ");
+                        addToCodeBuffer(node->data.funcDef.params[i]);
+                }
+            }
+           
             addToCodeBuffer(") {\n");
             for (int j = 0; j < node->data.funcDef.stmtCount; j++) {
                 toC(node->data.funcDef.stmt[j]);
@@ -920,17 +1000,35 @@ void toC(AstNode* node) {
             break;
 
         case nodeAssignment:
-            addToCodeBuffer("AssiType ")
+            addToCodeBuffer("AssiType ");
             addToCodeBuffer(node->data.assignment.identifier);
-            addToCodeBuffer("= ")
+            addToCodeBuffer("= ");
             toC(node->data.assignment.exp);
             addToCodeBuffer(";\n");
             break;
 
         case nodePrint:
-            addToCodeBuffer("printf( PrinType , ");
+            addToCodeBuffer("printf(");
+            
+            if (node->data.funcDef.hasOperator == 1) {
+                addToCodeBuffer("%d\n ");
+            }
+            else if (node->data.funcDef.hasOperator == 0) {
+                addToCodeBuffer("%f\n ");
+            }
+            else { 
+                fprintf(stderr, "IDK what the fuck happened here\n");
+            exit(1);
+            }
+            addToCodeBuffer( " , ");
             toC(node->data.print.exp);
             addToCodeBuffer(");\n");
+            break;
+
+        case nodeReturn:
+            addToCodeBuffer("return ");
+            toC(node->data.ret.exp);
+            addToCodeBuffer(";\n");
             break;
 
         case nodeExpression:
@@ -948,19 +1046,19 @@ void toC(AstNode* node) {
                 }
                 toC(node->data.functionCall.args[i]);
             }
-            addToCodeBuffer(")");
+            addToCodeBuffer(");\n");
             break;
 
         case nodeFactor:
             if (node->data.factor.identifier) { // identifier exists
                 addToCodeBuffer(node->data.factor.identifier);
-            } 
+            }
             else if (node->data.factor.funcCall) { // else if function call exists
-            toC(node->data.factor.funcCall);
-            } 
+                toC(node->data.factor.funcCall);
+            }
             else if (node->data.factor.exp) { // if expression exists
-                toC(node->data.factor.exp); 
-            } 
+                toC(node->data.factor.exp);
+            }
             else { // otherwise treat as constant
                 char buffer[50]; // Adjust size as needed
                 snprintf(buffer, sizeof(buffer), "%.6f", node->data.factor.constant);
@@ -974,26 +1072,13 @@ void toC(AstNode* node) {
     }
 }
 
-void modifyOutputFile(FILE *outFile) {
+//replaces assitype with correct int or float type
+void modifyOutputFile(buffer) {
     // Rewind the file pointer to the beginning of the file
 
+
+    /
     
-    rewind(outFile);
-    
-    // Read the content into memory (if necessary)
-    // This is optional; if you're making small edits, you might just want to write directly to the file.
-    // Use a buffer if needed for more complex modifications.
-    
-    // Example of adding additional content
-    fprintf(outFile, "// Additional generated code\n");
-    fprintf(outFile, "void extraFunction() {\n");
-    fprintf(outFile, "    // This function does something extra\n");
-    fprintf(outFile, "}\n");
-    
-    // Example of replacing text (simple example)
-    // You'll need to implement the logic to read and replace specific words in your output if desired.
-    
-    // If you read the content into memory, you would perform the replacements and then write it back
 }
 
 // ###################################### TRANSLATION TO C END ######################################
