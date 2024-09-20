@@ -949,20 +949,20 @@ void toC(AstNode* node) {
             addToCodeBuffer("}\n");
             break;
         
-        case nodeFuncDef:
+        case nodeFunctionDef:
             if (node->data.funcDef.isReturn ==1) {
-                addToCodeBuffer("int ")
+                addToCodeBuffer("int ");
             }
             else if (node->data.funcDef.isReturn == 0) {
-                addToCodeBuffer("void ")
+                addToCodeBuffer("void ");
             }
             else { 
                 fprintf(stderr, "IDK what the fuck happened here\n");
-            exit(1);
+                exit(1);
             }
-            
             addToCodeBuffer(node->data.funcDef.identifier);
             addToCodeBuffer("(");
+
             // check parameters exist
             if(node->data.funcDef.paramCount > 0) {
                 for (int i = 0; i < node->data.funcDef.paramCount; i++) {
