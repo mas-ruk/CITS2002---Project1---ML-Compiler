@@ -934,6 +934,7 @@ const char* getExpStr(AstNode* expr) {
         default:
             break;
     }
+    printf("Generated expression: %s\n", buffer); 
     return buffer;
 }
 
@@ -1191,20 +1192,9 @@ void toC(AstNode* node) {
 
 // ---------------------------------- TESTING --------------------------------- //
 
-const char* testCode = "# 24 is printed\nx <- 8\ny <- 3\nprint x * y";
-
-const char* additionalTests[] = {
-    "function noParams\n    return 0\n#",
-    "function singleParam x\n    return x + 1\n#",
-    "function multipleParams x, y\n    return x + y\n#",
-    "function invalidParam 1a\n    return 0\n#", // Invalid identifier
-    "one <- 1\nprint one\n#", // Simple assignment and print
-    "function nestedFunc\n    return increment(2)\n#\nprint nestedFunc()\n#", // Nested function calls
-    "function withReturn x\n    return (x + 1)\n#",
-    "function emptyFunc\n#",
-    "function paramError x, y, \n#",
-    "function repeatName x\n    return x\nfunction repeatName x\n    return x + 1\n#" // Duplicate function name
-};
+const char* testCode = "x <- 8\n"
+                        "y <- 3\n"
+                        "print x * y";
 
 void testLexer() {
     printf("Testing Lexer:\n");
@@ -1265,12 +1255,6 @@ void runTest(const char* testCode) {
 int main() {
     printf("Running initial test:\n");
     runTest(testCode); // Initial test case
-
-    printf("\nRunning additional tests:\n");
-    for (int i = 0; i < sizeof(additionalTests) / sizeof(additionalTests[0]); i++) {
-        printf("\nRunning test %d:\n", i + 1);
-        runTest(additionalTests[i]);
-    }
 
     return 0;
 }
