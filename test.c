@@ -963,22 +963,21 @@ void replaceAssiType(char* buffer) {
             // get variable name
             sscanf(linePos, "AssiType %12s", varName);
 
-            // check if the variable is used with an operator
             bool isInt = hasOperatorInExpression(line); // simplified logic from previous if statement
 
             // copy the part of the line before "AssiType" to the new buffer
-            size_t prefixLength = linePos - line;
-            newBufferIndex += prefixLength;
+            //size_t prefixLength = linePos - line;
+            //newBufferIndex += prefixLength;
 
-            // strncpy(newBuffer + newBufferIndex, line, linePos - line);
-            //newBufferIndex += linePos - line;
+            strncpy(newBuffer + newBufferIndex, line, linePos - line);
+            newBufferIndex += linePos - line;
 
-            const char* type = isInt ? "int " : "float ";
+            //const char* type = isInt ? "int " : "float ";
 
             // Replace "assitype" with "int" or "float"
-            strcpy(newBuffer + newBufferIndex, type);
+            //strcpy(newBuffer + newBufferIndex, type);
             
-            /*
+            
             if (isInt) {
                 strcpy(newBuffer + newBufferIndex, "int ");
             } else {
@@ -988,7 +987,7 @@ void replaceAssiType(char* buffer) {
 
             // move past assitype in line
             linePos += strlen("AssiType");
-            */
+            
         
         // copy rest of line
         if (*linePos) {
@@ -1043,20 +1042,13 @@ void toC(AstNode* node) {
         case nodeProgram:
             addToCodeBuffer("#include <stdio.h>\n\n");
 
-             // Generate variable declarations
-            for (int i = 0; i < variableCount; i++) {
-                addToCodeBuffer("float ");
-                addToCodeBuffer(variableNames[i]);
-                addToCodeBuffer(";\n");
-            }
-
             // Flag to check if funcdef exists
             bool functionDefined = false;
             // First pass to collect global variable assignments
             for (int i = 0; i < node->data.program.lineCount; i++) {
                 if (node->data.program.programItems[i]->type == nodeAssignment && !functionDefined) { // CHECK THIS
                     // Handle global variable
-                    addToCodeBuffer("AssiType "); // to do
+                    addToCodeBuffer(node->data.program.programItems[i]->data.stmt.data.assignment.isInt ? "int " : "float ");
                     addToCodeBuffer(node->data.program.programItems[i]->data.stmt.data.assignment.identifier);
                     addToCodeBuffer(" = ");
                     toC(node->data.program.programItems[i]->data.stmt.data.assignment.exp);
@@ -1190,7 +1182,7 @@ void toC(AstNode* node) {
     }
 }
 
-// ------------------- TESTING ------------------- //
+// ---------------------------------- TESTING --------------------------------- //
 
 const char* testCode = "# 24 is printed\nx <- 8\ny <- 3\nprint x * y";
 
