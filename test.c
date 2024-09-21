@@ -803,7 +803,7 @@ AstNode* pFuncDef() {
         funcDefNode->data.funcDef.isReturn = 0; // init as 0
 
         if (pCurrentTkn().type == TknTab) { // Expecting indented statements
-            pMoveToNextTkn;
+            pMoveToNextTkn();
             if (funcDefNode->data.funcDef.stmtCount < MAX_STATEMENTS) {
                 printf("Statment token: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
                 AstNode* stmtNode = pStmt();
@@ -1031,7 +1031,7 @@ void toC(AstNode* node) {
 
             // Flag to check if funcdef exists
             bool functionDefined = false;
-            int storedI = 0;
+            // int storedI = 0;
             // First pass to collect function definitions
             for (int i = 0; i < node->data.program.lineCount; i++) {
                 if (node->data.program.programItems[i]->type == nodeAssignment && !functionDefined) { // handle global variable
