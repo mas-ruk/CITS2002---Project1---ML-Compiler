@@ -1048,7 +1048,7 @@ void toC(AstNode* node) {
             for (int i = 0; i < node->data.program.lineCount; i++) {
                 if (node->data.program.programItems[i]->type == nodeAssignment && !functionDefined) { // CHECK THIS
                     // Handle global variable
-                    addToCodeBuffer(node->data.program.programItems[i]->data.stmt.data.assignment.isInt ? "int " : "float ");
+                    addToCodeBuffer("AssiType "); // to do
                     addToCodeBuffer(node->data.program.programItems[i]->data.stmt.data.assignment.identifier);
                     addToCodeBuffer(" = ");
                     toC(node->data.program.programItems[i]->data.stmt.data.assignment.exp);
