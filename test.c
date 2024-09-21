@@ -600,8 +600,12 @@ AstNode* pFuncCall() {
     AstNode* funcCallNode = createNode(nodeFunctionCall);
 
     // Consume (EDIT: STORE) the function name
-    funcCallNode -> data.funcCall.identifier = strdup(Tokens[pCurrentTknIndex - 1].value);
-
+    if (pCurrentTkn().type == TknLBracket) {
+    funcCallNode -> data.funcCall.identifier = strdup(Tokens[pCurrentTknIndex -1].value);
+    }
+    else {
+    funcCallNode -> data.funcCall.identifier = strdup(Tokens[pCurrentTknIndex].value);
+    }
     pMoveToNextTkn(); // function identifier eaten
 
     printf("Token currently: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
@@ -785,23 +789,26 @@ AstNode* pFuncDef() {
         }
         
         if (pCurrentTkn().type == TknNewline) {
-            // valid function with no parameters do nothing
+            pMoveToNextTkn();// valid function with no parameters do nothing
         } 
         else {
             printf("! SYNTAX ERROR: Expected newline or identifier after function name\n");
             exit(EXIT_FAILURE);
         }
-
+    
+        printf("token atm: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
         // Parse the function body (statements)
         funcDefNode->data.funcDef.stmt = (AstNode**)malloc(sizeof(AstNode*) * MAX_STATEMENTS); 
         funcDefNode->data.funcDef.stmtCount = 0;
         funcDefNode->data.funcDef.isReturn = 0; // init as 0
 
-        while (pCurrentTkn().type == TknTab) { // Expecting indented statements
+        if (pCurrentTkn().type == TknTab) { // Expecting indented statements
+            pMoveToNextTkn;
             if (funcDefNode->data.funcDef.stmtCount < MAX_STATEMENTS) {
+                printf("Statment token: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
                 AstNode* stmtNode = pStmt();
                 funcDefNode->data.funcDef.stmt[funcDefNode->data.funcDef.stmtCount++] = stmtNode; // Parse statement
-
+                printf("STMT COUNT: %d\n", funcDefNode->data.funcDef.stmtCount);
                 if (stmtNode->type == nodeReturn) {
                     funcDefNode -> data.funcDef.isReturn = 1;
                 }
@@ -815,7 +822,7 @@ AstNode* pFuncDef() {
                 pMoveToNextTkn(); // Move to next line
             } 
             else if (pCurrentTkn().type != TknTab) {
-                break; // Exit loop if not indented anymore
+                //loop back ig right?
             }
         }
     } 
@@ -1024,18 +1031,20 @@ void toC(AstNode* node) {
 
             // Flag to check if funcdef exists
             bool functionDefined = false;
-            // First pass to collect global variable assignments
+            int storedI = 0;
+            // First pass to collect function definitions
             for (int i = 0; i < node->data.program.lineCount; i++) {
-                if (node->data.program.programItems[i]->type == nodeAssignment && !functionDefined) { // CHECK THIS
-                    // Handle global variable
+                if (node->data.program.programItems[i]->type == nodeAssignment && !functionDefined) { // handle global variable
                     addToCodeBuffer("AssiType "); // to do
                     addToCodeBuffer(node->data.program.programItems[i]->data.stmt.data.assignment.identifier);
                     addToCodeBuffer(" = ");
                     toC(node->data.program.programItems[i]->data.stmt.data.assignment.exp);
                     addToCodeBuffer(";\n");
-                } else if (node->data.program.programItems[i]->type == nodeFunctionDef) {
-                    functionDefined = true; // Mark that we've seen a function
-                    toC(node->data.program.programItems[i]); // Process function definitions
+                }
+                else if (node->data.program.programItems[i]->type == nodeFunctionDef) {
+                    functionDefined = true;
+                    toC(node->data.program.programItems[i]);
+  
                 }
             }
 
@@ -1047,7 +1056,7 @@ void toC(AstNode* node) {
             for (int j = 0; j < node->data.program.lineCount; j++) {
                 if (node->data.program.programItems[j]->type == nodePrint) { // check this
                     toC(node->data.program.programItems[j]);
-                } else if (node->data.program.programItems[j]->type == nodeAssignment && functionDefined) { //check this
+                } else if (node->data.program.programItems[j]->type == nodeAssignment) { //check this
                     toC(node->data.program.programItems[j]);
                 } else if (node->data.program.programItems[j]->type == nodeReturn) { // check this
                     toC(node->data.program.programItems[j]);
@@ -1082,7 +1091,9 @@ void toC(AstNode* node) {
             }
             addToCodeBuffer(") {\n");
 
+            // Add the function body
             for (int j = 0; j < node->data.funcDef.stmtCount; j++) {
+                printf("Flagged stmt body");
                 toC(node->data.funcDef.stmt[j]);
             }
             addToCodeBuffer("}\n\n");
@@ -1111,7 +1122,7 @@ void toC(AstNode* node) {
             // Output the full expression to the buffer
             toC(node->data.stmt.data.print.exp);
     
-             addToCodeBuffer(");\n");
+            addToCodeBuffer(");\n");
             break;
 
         case nodeReturn:
@@ -1153,6 +1164,7 @@ void toC(AstNode* node) {
             break;
 
         case nodeFunctionCall:
+            printf("Function Call Identifier: %s\n", node->data.funcCall.identifier);
             addToCodeBuffer(node->data.funcCall.identifier);
             addToCodeBuffer("(");
             for (int i = 0; i < node->data.funcCall.argCount; i++) {
@@ -1190,8 +1202,8 @@ void toC(AstNode* node) {
 // ---------------------------------- TESTING --------------------------------- //
 
 const char* testCode = "function multiply a b\n"
-                        "return a + b\n"
-                        "print multiply(12,6)"
+                        "\treturn a + b\n"
+                        "print multiply(12, 6)"
                         ;
 
 void testLexer() {
