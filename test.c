@@ -1150,9 +1150,35 @@ void toC(AstNode* node) {
             break;
 
         case nodeExpression:
-            toC(node->data.Expression.lVar);
-            addToCodeBuffer(node->data.Expression.oper);
-            toC(node->data.Expression.rVar);
+            // Process the left side of the term
+            toC(node->data.Expression.lVar);  // Left-hand side of the term (could be a factor)
+    
+            // Add the operator (if any)
+            if (node->data.Expression.oper != NULL) {
+                addToCodeBuffer(node->data.Expression.oper);  // The operator (like *, /)
+            }
+    
+            // Process the right side of the term (if there is one)
+            if (node->data.Expression.rVar != NULL) {
+                toC(node->data.Expression.rVar);  // Right-hand side of the term
+            }
+    
+            break;
+
+        case nodeTerm:
+            // Process the left side of the term
+            toC(node->data.term.lVar);  // Left-hand side of the term (could be a factor)
+    
+            // Add the operator (if any)
+            if (node->data.term.oper != NULL) {
+                addToCodeBuffer(node->data.term.oper);  // The operator (like *, /)
+            }
+    
+            // Process the right side of the term (if there is one)
+            if (node->data.term.rVar != NULL) {
+                toC(node->data.term.rVar);  // Right-hand side of the term
+            }
+    
             break;
 
         case nodeFunctionCall:
