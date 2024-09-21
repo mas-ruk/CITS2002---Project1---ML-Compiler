@@ -69,6 +69,8 @@ typedef struct AstNode {
             int paramCount;
             struct AstNode **stmt; // array of statment nodes
             int stmtCount;
+            int isReturn;
+
         } funcDef;
         
         // statement node
@@ -690,10 +692,17 @@ AstNode* pFuncDef() {
         // Parse the function body (statements)
         funcDefNode->data.funcDef.stmt = (AstNode**)malloc(sizeof(AstNode*) * MAX_STATEMENTS); 
         funcDefNode->data.funcDef.stmtCount = 0;
+        funcDefNode->data.funcDef.isReturn = 0; // init as 0
 
         while (pCurrentTkn().type == TknTab) { // Expecting indented statements
             if (funcDefNode->data.funcDef.stmtCount < MAX_STATEMENTS) {
-                funcDefNode->data.funcDef.stmt[funcDefNode->data.funcDef.stmtCount++] = pStmt(); // Parse statement
+                AstNode* stmtNode = pStmt();
+                funcDefNode->data.funcDef.stmt[funcDefNode->data.funcDef.stmtCount++] = stmtNode; // Parse statement
+
+                if (stmtNode->type == nodeReturn) {
+                    funcDefNode -> data.funcDef.isReturn = 1;
+                }
+            
             } else {
                 printf("@ Error: Too many statements in function body. Maximum is %d.\n", MAX_STATEMENTS);
                 exit(EXIT_FAILURE);
@@ -781,8 +790,279 @@ AstNode* pProgram() {
     return programNode;
 }
 
-// ------------- INTERPRETER------------- //
+// ------------------------------------------- INTERPRETER-------------------------------------- //
 
+//declare interpreter buffer size
+#define BUFFER_SIZE 2048 // may change
+
+char* codeBuffer; // Global buffer for C code
+int bufferLength = 0;
+
+// Free the buffer
+void freeBuffer() {
+    free(codeBuffer);
+}
+
+// Initialize buffer
+void initBuffer() {
+    codeBuffer = malloc(BUFFER_SIZE); // CHECK THIS PLEASE
+    if (!codeBuffer) {
+        fprintf(stderr, "Memory allocation failed\n");
+        exit(1);
+    }
+    codeBuffer[0] = '\0'; // Start with an empty string
+}
+
+/// Append string to buffer
+void addToCodeBuffer(const char* str) {
+    int len = strlen(str);
+    if (bufferLength + len >= BUFFER_SIZE) {
+        // Resize buffer if necessary
+        char* newBuffer = realloc(codeBuffer, bufferLength + len + 1);
+        if (!newBuffer) {
+            fprintf(stderr, "Memory reallocation failed\n");
+            freeBuffer(); // Clean up existing buffer
+            exit(1);
+        }
+        codeBuffer = newBuffer;
+    }
+    strcat(codeBuffer, str);
+    bufferLength += len;
+}
+
+//helper function
+bool hasOperatorInExpression(const char* expression) {
+    // Check for presence of operators in the expression string
+    return (strstr(expression, "+") || strstr(expression, "-") || 
+            strstr(expression, "*") || strstr(expression, "/"));
+}
+
+void replaceAssiType(char* buffer) {
+    //check assitype exists in buffer
+    if (!strstr(buffer, "AssiType")) {
+        return; // no replacements needed
+    }
+    
+    size_t bufferLength = strlen(buffer); // length of original buffer    
+    // create new buffer for modifed string
+    char* newBuffer = malloc(bufferLength + 1); // Check this
+    if (!newBuffer) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return;
+    }
+    
+    size_t newBufferIndex = 0;
+    char varName[13]; // var name should only be 12 long -> so 12 + 1 for null character
+    
+    // Iterate through the original buffer line by line
+    char* line = strtok(buffer, "\n");
+    while (line) {
+        char* linePos = line;
+        while ((linePos = strstr(linePos, "AssiType"))) {
+            // get variable name
+            sscanf(linePos, "AssiType %12s", varName);
+
+            // check if the variable is used with an operator
+            bool isInt = hasOperatorInExpression(line); // simplified logic from previous if statement
+
+            // copy the part of the line before "AssiType" to the new buffer
+            strncpy(newBuffer + newBufferIndex, line, linePos - line);
+            newBufferIndex += linePos - line;
+
+            // Replace "assitype" with "int" or "float"
+            if (isInt) {
+                strcpy(newBuffer + newBufferIndex, "int ");
+            } else {
+                strcpy(newBuffer + newBufferIndex, "float ");
+            }
+            newBufferIndex += isInt ? 4 : 6; // length of inserted stuff
+
+            // move past assitype in line
+            linePos += strlen("AssiType");
+        }
+
+        // copy rest of line
+        if (linePos && *linePos) {
+            strcpy(newBuffer + newBufferIndex, linePos);
+            newBufferIndex += strlen(linePos);
+        }
+
+        // add newline if not last line
+        newBuffer[newBufferIndex++] = '\n';
+
+        // get next line
+        line = strtok(NULL, "\n");
+    }
+
+    // null terminate new generated buffer code
+    newBuffer[newBufferIndex] = '\0';
+
+    // copy new buffer back to og buffer
+    strcpy(buffer, newBuffer);
+
+    // Free (delete) new buffer
+    free(newBuffer);
+}
+
+void writeCFile() {
+    FILE *cFile = fopen("mlProgram.c", "w");
+    if (cFile == NULL) {
+        fprintf(stderr, "! Error: Could not create C file\n");
+        return;
+    }
+    fprintf(cFile, "%s", codeBuffer); // buffer to file
+    fclose(cFile);
+}
+
+// defining translation to rudimentaty C program
+void toC(AstNode* node) {
+
+    // first we gotta check if the node is existing
+    if (!node) {
+        return;
+    }
+    switch (node->type) {
+        case nodeProgram:
+            addToCodeBuffer("#include <stdio.h>\n\n");
+
+            // Flag to check if funcdef exists
+            bool functionDefined = false;
+            // First pass to collect global variable assignments
+            for (int i = 0; i < node->data.program.lineCount; i++) {
+                if (node->data.program.programItems[i]->type == nodeAssignment && !functionDefined) { // CHECK THIS
+                    // Handle global variable
+                    addToCodeBuffer("AssiType "); // to do
+                    addToCodeBuffer(node->data.program.programItems[i]->data.stmt.data.assignment.identifier);
+                    addToCodeBuffer(" = ");
+                    toC(node->data.program.programItems[i]->data.stmt.data.assignment.exp);
+                    addToCodeBuffer(";\n");
+                } else if (node->data.program.programItems[i]->type == nodeFunctionDef) {
+                    functionDefined = true; // Mark that we've seen a function
+                    toC(node->data.program.programItems[i]); // Process function definitions
+                }
+            }
+
+            // add main functions
+            addToCodeBuffer("int main() {\n");
+            bool hasReturn = false; // flag to track if a return statement is made in main
+
+            // Process all statements that should be executed in main
+            for (int j = 0; j < node->data.program.lineCount; j++) {
+                if (node->data.program.programItems[j]->type == nodePrint) { // check this
+                    toC(node->data.program.programItems[j]);
+                } else if (node->data.program.programItems[j]->type == nodeAssignment && functionDefined) { //check this
+                    toC(node->data.program.programItems[j]);
+                } else if (node->data.program.programItems[j]->type == nodeReturn) { // check this
+                    toC(node->data.program.programItems[j]);
+                    hasReturn = true;
+                }
+            }
+            // Only add return 0 if no return statement has been encountered
+            if (!hasReturn) {
+                addToCodeBuffer("    return 0;\n");
+            }
+            addToCodeBuffer("}\n");
+            break;
+        
+        case nodeFunctionDef:
+            if (node->data.funcDef.isReturn == 1) {
+                addToCodeBuffer("int ");
+            }
+            else if (node->data.funcDef.isReturn == 0) {
+                addToCodeBuffer("void ");
+            }
+            else { 
+                fprintf(stderr, "IDK what the fuck happened here\n");
+                exit(1);
+            }
+            addToCodeBuffer(node->data.funcDef.identifier);
+            addToCodeBuffer("(");
+
+            for (int i = 0; i < node->data.funcDef.paramCount; i++) {
+                if (i > 0) addToCodeBuffer(", "); // need to change
+                    addToCodeBuffer("int ");
+                    addToCodeBuffer(node->data.funcDef.params[i]);
+            }
+            addToCodeBuffer(") {\n");
+
+            for (int j = 0; j < node->data.funcDef.stmtCount; j++) {
+                toC(node->data.funcDef.stmt[j]);
+            }
+            addToCodeBuffer("}\n\n");
+            break;
+
+        case nodeAssignment:
+            addToCodeBuffer("AssiType ");
+            addToCodeBuffer(node->data.stmt.data.assignment.identifier);
+            addToCodeBuffer(" = ");
+            toC(node->data.assignment.exp);
+            addToCodeBuffer(";\n");
+            break;
+
+        case nodePrint:
+            addToCodeBuffer("printf(");
+            
+            char expStr[100]; 
+            snprintf(expStr, sizeof(expStr), "%s", node->data.stmt.data.print.exp->data.factor.identifier); // Example for simple identifiers
+            
+            if (hasOperatorInExpression(expStr)) {
+                addToCodeBuffer("\"%d\\n\", ");
+            } else {
+                addToCodeBuffer("\"%f\\n\", ");
+            }
+            
+            addToCodeBuffer(", ");
+            toC(node->data.stmt.data.print.exp);
+            addToCodeBuffer(");\n");
+            break;
+
+        case nodeReturn:
+            addToCodeBuffer("return ");
+            toC(node->data.stmt.data.returnStmt.exp);
+            addToCodeBuffer(";\n");
+            break;
+
+        case nodeExpression:
+            toC(node->data.Expression.lVar);
+            addToCodeBuffer(node->data.Expression.oper);
+            toC(node->data.Expression.rVar);
+            break;
+
+        // !!!!!!!!!!!!! SOMETHING IS FUCKED HERE WITH THE DEF OF NODE FUNCCALL WILL FIX
+        case nodeFunctionCall:
+            addToCodeBuffer(node->data.funcCall.identifier);
+            addToCodeBuffer("(");
+            for (int i = 0; i < node->data.funcCall.argCount; i++) {
+                if (i > 0) {
+                    addToCodeBuffer(",");
+                }
+                toC(node->data.funcCall.args[i]);
+            }
+            addToCodeBuffer(");\n");
+            break;
+
+        case nodeFactor:
+            if (node->data.factor.identifier) { // identifier exists
+                addToCodeBuffer(node->data.factor.identifier);
+            }
+            else if (node->data.factor.funcCall) { // else if function call exists
+                toC(node->data.factor.funcCall);
+            }
+            else if (node->data.factor.exp) { // if expression exists
+                toC(node->data.factor.exp);
+            }
+            else { // otherwise treat as constant
+                char buffer[50]; // Adjust size as needed
+                snprintf(buffer, sizeof(buffer), "%.6f", node->data.factor.constant);
+                addToCodeBuffer(buffer);
+            }
+            break;
+
+        default:
+            // Handle error or unsupported node types
+            fprintf(stderr, "unknown AST node type: %d\n", node->type);
+    }
+}
 
 // ------------------- TESTING ------------------- //
 
@@ -814,31 +1094,53 @@ void testLexer() {
 }
 
 void runTest(const char* testCode) {
+    // Initialize the buffer for generated C code
+    initBuffer();
+    
+    // Tokenize the test code
     tokenize(testCode);
     pCurrentTknIndex = 0;
 
-    AstNode* result = pProgram(); // Run the parser
+    // Parse the code and build the AST
+    AstNode* result = pProgram(); 
     if (result != NULL) {
+        // Convert the AST to C code
+        toC(result);
+
+        // Write the generated C code to a file
+        FILE *cFile = fopen("mlProgram.c", "w");
+        if (cFile != NULL) {
+            fputs(codeBuffer, cFile);
+            fclose(cFile);
+        } else {
+            printf("Error writing C file.\n");
+            return;
+        }
+
+        // Print the generated C code (for debugging)
+        printf("Generated C code:\n%s\n", codeBuffer);
+
+        // Optionally, you can compile and execute the C code using a system call
+        system("gcc mlProgram.c -o mlProgram && ./mlProgram");
+
         printf("Test passed!\n");
     } else {
         printf("Test failed!\n");
     }
 
-    // Clean up memory, if necessary
-}
-
-void parseFile(const char* filename) {
-    int result = readFile(filename);
-    if (result == 0) {
-        pProgram();
-        // Print the parsed program (optional)
-        // printProgram(program);
-    }
+    // Free the buffer memory
+    freeBuffer();
 }
 
 int main() {
+    printf("Running initial test:\n");
+    runTest(testCode); // Initial test case
 
-    runTest(testCode);
+    printf("\nRunning additional tests:\n");
+    for (int i = 0; i < sizeof(additionalTests) / sizeof(additionalTests[0]); i++) {
+        printf("\nRunning test %d:\n", i + 1);
+        runTest(additionalTests[i]);
+    }
 
     return 0;
 }
