@@ -169,6 +169,7 @@ void addToken(TknType type, const char *value) {
     TknIndex++; // increases token index/position pointer
     TknCount++; // increment token count
     print_token(Tokens[TknIndex - 1]);
+    printf("Creating Token - Type: %d, Value: '%s'\n", type, value); // debugging
 }
 
 // function to check validity of identifiers
@@ -383,8 +384,6 @@ int readFile(const char *filename) {
     return 0;
 }
 
-//need to add a checker that checks there are max 50 unique identifiers
-
 // ###################################### TOKENISATION END ######################################
 
 // ###################################### PARSING START ######################################
@@ -457,21 +456,26 @@ return false;
 }
 
 AstNode* pFactor() {
+    printf("Entering pFactor()\n");
     AstNode* factorNode = NULL;
     
     // check for number existence
     if (pCurrentTkn().type == TknNumber) {
+        printf("Found number: %f\n", atof(pCurrentTkn().value));  // Use %f for double
         factorNode = createNode(nodeFactor);
         factorNode -> data.factor.constant = atof(pCurrentTkn().value);
         pMoveToNextTkn();
     }
     // check for float existence
     else if (pCurrentTkn().type == TknFloat) {
+        printf("Found number: %f\n", atof(pCurrentTkn().value));  // Use %f for double
         factorNode = createNode(nodeFactor);
+        printf("Created float node");
         factorNode -> data.factor.constant = atof(pCurrentTkn().value);
         pMoveToNextTkn();
     } 
     else if (pCurrentTkn().type == TknIdentifier) {
+        printf("Found identifier: %s\n", pCurrentTkn().value);
         // if function call
         if (doesFunctionExist(pCurrentTkn().value)) { 
             factorNode = createNode(nodeFactor);
@@ -481,6 +485,7 @@ AstNode* pFactor() {
         else    {
             factorNode = createNode(nodeFactor);
             factorNode -> data.factor.identifier = strdup(pCurrentTkn().value);
+            printf("Stored identifier: %s\n", factorNode->data.factor.identifier);
             pMoveToNextTkn();
             //if (pCurrentTkn().type != TknNewline && pCurrentTkn().type != TknEnd) {
             //    printf ("! SYNTAX ERROR: Expected new line after non-function name identifier\n.");
@@ -488,6 +493,7 @@ AstNode* pFactor() {
             //}
         }
     } else if (pCurrentTkn().type == TknLBracket) {
+        printf("Found left bracket\n");
         pMoveToNextTkn();
         factorNode = createNode(nodeFactor);
         // check stuff within the brackets 
@@ -496,46 +502,91 @@ AstNode* pFactor() {
                 printf("! SYNTAX ERROR: Invalid factor. Expected ')' after expression.\n");
                 exit(1);
             }    
+        printf("Found right bracket\n");
         pMoveToNextTkn(); // consume ')'
     } else {
         printf("! SYNTAX ERROR: Invalid factor. Expected functioncall, real constant, identifer or '(' expression ')'.\n.");
         exit(1);
     }
+    printf("Exiting pFactor()\n");
     return factorNode;
 }
 
 // creating that left right operator child tree
-AstNode* pTerm(){    
+AstNode* pTerm(){
+    printf("Entering pTerm()\n");    
     AstNode* fctrNode = pFactor(); // parse first factor
     // if is factor operator must parse recursively
-    if (pCurrentTkn().type == TknFactorOperator) {
+
+    // debug
+    if (!fctrNode) {
+        printf("! SYNTAX ERROR: Expected a valid factor.\n");
+        return NULL; // Handle error
+    }
+
+    printf("Parsed factor: %f\n", fctrNode->data.factor.constant); 
+
+    while (pCurrentTkn().type == TknFactorOperator) {
         char* oper = strdup(pCurrentTkn().value); // store oper
+        printf("Found multiplication/division operator: '%s'\n", oper);
+
+
         pMoveToNextTkn(); // move to next token
         AstNode* rVarNode = pTerm(); // parse next token
+
+        // debug
+        if (!rVarNode) {
+            printf("! SYNTAX ERROR: Expected valid factor after operator '%s'.\n", oper);
+            free(oper); // Clean up
+            return NULL; // Handle error
+        }
+
         AstNode* termNode = createNode(nodeTerm);
         termNode -> data.term.lVar = fctrNode; // node given lVar property i.e. the left factor 
         termNode -> data.term.rVar = rVarNode; // right variable 
         termNode -> data.term.oper = oper; // operator assigned as well
-        return termNode; 
-    } return fctrNode;
+        fctrNode = termNode; 
+    } 
+    printf("Exiting pTerm()\n");
+    return fctrNode;
 }
 
 AstNode* pExpression(){
+    printf("Entering pExpression() with current node %s\n", pCurrentTkn().value);
     AstNode* termNode = pTerm(); // parse first term
-    if (pCurrentTkn().type == TknTermOperator) {
+    if (!termNode) {
+        printf("! SYNTAX ERROR: Expected a valid term.\n");
+        return NULL; // Return or handle error
+    }
+    
+    while (pCurrentTkn().type == TknTermOperator) {
         char* oper = strdup(pCurrentTkn().value);
+        printf("Found term operator: '%s'\n", oper);
+
         pMoveToNextTkn();
         AstNode* rVarNode = pExpression();
+
+        // debug
+        if (!rVarNode) {
+            printf("! SYNTAX ERROR: Expected valid expression after operator '%s'.\n", oper);
+            free(oper); // Clean up
+            return NULL; // Handle error
+        }
+
         AstNode* exprNode = createNode(nodeExpression);
         exprNode -> data.Expression.lVar = termNode; 
         exprNode -> data.Expression.oper = oper;
         exprNode->data.Expression.rVar = rVarNode;
-        return exprNode;
-    } return termNode;
+        termNode = exprNode;
+    
+    } 
+    printf("Exiting pExpression()\n");
+    return termNode;
 }
 
 #define MAX_ARGS 1000
 AstNode* pFuncCall() {
+    printf("Entering pFuncCall()\n");
     AstNode* funcCallNode = createNode(nodeFunctionCall);
 
     // Consume (EDIT: STORE) the function name
@@ -585,38 +636,60 @@ AstNode* pFuncCall() {
     return funcCallNode;
 }
 
+#define MAX_VARIABLES 50
+
+char variableNames[MAX_VARIABLES][12];
+int variableCount = 0;
+
+// Function to add a variable name
+void addVariable(const char* name) {
+    if (variableCount < MAX_VARIABLES) {
+        strncpy(variableNames[variableCount++], name, 12);
+    }
+}
+
 // parsing over statements
 AstNode* pStmt() {
+    printf("Entering pStmt() with node of type %d\n", pCurrentTkn().type);
     AstNode* stmtNode = createNode(nodeStmt);
-    switch (pCurrentTkn().type){
+    
+    switch (pCurrentTkn().type) {
         case TknIdentifier:
+            printf("Detected identifier: '%s'\n", pCurrentTkn().value); // debug
+            
             if (doesFunctionExist(pCurrentTkn().value)) {
+                printf("Function call detected for: '%s'\n", pCurrentTkn().value); // debug
                 // function call
                 stmtNode->data.stmt.data.funcCall.funcCall = pFuncCall();
                 stmtNode->type = nodeFunctionCall;
             } else {
+                printf("Assignment detected for: '%s'\n", pCurrentTkn().value); // debug
                 // assignment
+                addVariable(pCurrentTkn().value);
                 stmtNode -> data.stmt.data.assignment.identifier = strdup(pCurrentTkn().value); // store identifier
                 pMoveToNextTkn(); // move to next token
-            }
+                printf("Current token after identifier: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
+                
                 //check assignment operator correctly exists here
-                if (pCurrentTkn().type == TknAssignmentOperator){
+                if (pCurrentTkn().type == TknAssignmentOperator) {
+                    printf("Assignment operator '<-' detected.\n");
                     pMoveToNextTkn(); // consume the assignment operator
+                    
                     stmtNode -> data.stmt.data.assignment.exp = pExpression();
                     stmtNode -> type = nodeAssignment;
                 
-                // validate expression exists for assignment operator 
-                    if (!stmtNode->data.assignment.exp) {
+                    // validate expression exists for assignment operator 
+                    if (!stmtNode->data.stmt.data.assignment.exp) {
                         printf("! SYNTAX ERROR: Expected a valid expression term after assignment operator '<-'.\n");
-                        exit(1);
-                }
-                else {
-                printf("! SYNTAX ERROR: Expected assignment operator '<-' after non-function name identifier.\n") ;
-                exit(EXIT_FAILURE);
+                        exit(EXIT_FAILURE);
+                    }
+                } else {
+                    printf("! SYNTAX ERROR: Expected assignment operator '<-' after non-function name identifier.\n") ;
+                    exit(EXIT_FAILURE);
                 }     
+                break;
             }
-            break;
-        
+
         case TknPrint:
             pMoveToNextTkn(); // eat print nom nom nom 
             stmtNode -> data.stmt.data.print.exp = pExpression();
@@ -645,6 +718,8 @@ AstNode* pStmt() {
             printf("! SYNTAX ERROR: Unexpected token. valid statement starting args include print, return and function calls.");
             exit(EXIT_FAILURE);
     }
+
+    printf("Exiting pStmt()\n");
     return stmtNode;
 }
 
@@ -652,6 +727,7 @@ AstNode* pStmt() {
 #define MAX_STATEMENTS 1000
 // parsing over a function definition
 AstNode* pFuncDef() {
+    printf("Entering pFuncDef()\n"); // debugging
     // add node to tree
     AstNode* funcDefNode = createNode(nodeFunctionDef);
     pMoveToNextTkn();  // Go to next token
@@ -725,6 +801,7 @@ AstNode* pFuncDef() {
 }
 
 AstNode* pProgItem() {
+    printf("Entering pProgItem()\n");
     // handle newlines (skip and continue)
     while (pCurrentTkn().type == TknNewline) {
         pMoveToNextTkn();
@@ -766,6 +843,7 @@ AstNode* pProgItem() {
 
 #define MAX_LINES 10000
 AstNode* pProgram() {
+    printf("Entering pProgram()\n");
     AstNode* programNode = createNode(nodeProgram);
     
     // line count
@@ -837,6 +915,29 @@ bool hasOperatorInExpression(const char* expression) {
             strstr(expression, "*") || strstr(expression, "/"));
 }
 
+const char* getExpStr(AstNode* expr) {
+    static char buffer[100]; 
+    buffer[0] = '\0'; 
+
+    if (!expr) return buffer;
+
+    switch (expr->type) {
+        case nodeFactor:
+            snprintf(buffer, sizeof(buffer), "%s", expr->data.factor.identifier); // Adjust as needed
+            break;
+        case nodeExpression:
+            snprintf(buffer, sizeof(buffer), "%s %s %s",
+                getExpStr(expr->data.Expression.lVar),
+                expr->data.Expression.oper,
+                getExpStr(expr->data.Expression.rVar));
+            break;
+        default:
+            break;
+    }
+    return buffer;
+}
+
+
 void replaceAssiType(char* buffer) {
     //check assitype exists in buffer
     if (!strstr(buffer, "AssiType")) {
@@ -866,10 +967,18 @@ void replaceAssiType(char* buffer) {
             bool isInt = hasOperatorInExpression(line); // simplified logic from previous if statement
 
             // copy the part of the line before "AssiType" to the new buffer
-            strncpy(newBuffer + newBufferIndex, line, linePos - line);
-            newBufferIndex += linePos - line;
+            size_t prefixLength = linePos - line;
+            newBufferIndex += prefixLength;
+
+            // strncpy(newBuffer + newBufferIndex, line, linePos - line);
+            //newBufferIndex += linePos - line;
+
+            const char* type = isInt ? "int " : "float ";
 
             // Replace "assitype" with "int" or "float"
+            strcpy(newBuffer + newBufferIndex, type);
+            
+            /*
             if (isInt) {
                 strcpy(newBuffer + newBufferIndex, "int ");
             } else {
@@ -879,14 +988,23 @@ void replaceAssiType(char* buffer) {
 
             // move past assitype in line
             linePos += strlen("AssiType");
-        }
-
+            */
+        
         // copy rest of line
-        if (linePos && *linePos) {
+        if (*linePos) {
             strcpy(newBuffer + newBufferIndex, linePos);
             newBufferIndex += strlen(linePos);
         }
 
+        /*
+        if (linePos && *linePos) {
+            strcpy(newBuffer + newBufferIndex, linePos);
+            newBufferIndex += strlen(linePos);
+        }
+        */
+        break;
+    
+        }
         // add newline if not last line
         newBuffer[newBufferIndex++] = '\n';
 
@@ -924,6 +1042,13 @@ void toC(AstNode* node) {
     switch (node->type) {
         case nodeProgram:
             addToCodeBuffer("#include <stdio.h>\n\n");
+
+             // Generate variable declarations
+            for (int i = 0; i < variableCount; i++) {
+                addToCodeBuffer("float ");
+                addToCodeBuffer(variableNames[i]);
+                addToCodeBuffer(";\n");
+            }
 
             // Flag to check if funcdef exists
             bool functionDefined = false;
@@ -1002,17 +1127,19 @@ void toC(AstNode* node) {
         case nodePrint:
             addToCodeBuffer("printf(");
             
+            // Create a buffer to hold the expression string
             char expStr[100]; 
-            snprintf(expStr, sizeof(expStr), "%s", node->data.stmt.data.print.exp->data.factor.identifier); // Example for simple identifiers
-            
-            if (hasOperatorInExpression(expStr)) {
-                addToCodeBuffer("\"%d\\n\", ");
-            } else {
-                addToCodeBuffer("\"%f\\n\", ");
-            }
+            snprintf(expStr, sizeof(expStr), "%s", getExpStr(node->data.stmt.data.print.exp)); 
+
+            // Determine the format string based on the expression
+            char* formatStr = hasOperatorInExpression(expStr) ? "\"%d\\n\"" : "\"%f\\n\"";
+            addToCodeBuffer(formatStr);
             
             addToCodeBuffer(", ");
+            
+            // Output the full expression to the buffer
             toC(node->data.stmt.data.print.exp);
+            
             addToCodeBuffer(");\n");
             break;
 
@@ -1028,7 +1155,6 @@ void toC(AstNode* node) {
             toC(node->data.Expression.rVar);
             break;
 
-        // !!!!!!!!!!!!! SOMETHING IS FUCKED HERE WITH THE DEF OF NODE FUNCCALL WILL FIX
         case nodeFunctionCall:
             addToCodeBuffer(node->data.funcCall.identifier);
             addToCodeBuffer("(");
@@ -1066,7 +1192,7 @@ void toC(AstNode* node) {
 
 // ------------------- TESTING ------------------- //
 
-const char* testCode = "function printsum a b\nprint a + b\n#\nprintsum (12, 6)\n";
+const char* testCode = "# 24 is printed\nx <- 8\ny <- 3\nprint x * y";
 
 const char* additionalTests[] = {
     "function noParams\n    return 0\n#",
@@ -1104,8 +1230,11 @@ void runTest(const char* testCode) {
     // Parse the code and build the AST
     AstNode* result = pProgram(); 
     if (result != NULL) {
+        replaceAssiType(codeBuffer);
+
         // Convert the AST to C code
         toC(result);
+        
 
         // Write the generated C code to a file
         FILE *cFile = fopen("mlProgram.c", "w");
@@ -1130,6 +1259,8 @@ void runTest(const char* testCode) {
 
     // Free the buffer memory
     freeBuffer();
+
+    system("rm mlProgram.c");
 }
 
 int main() {
