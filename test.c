@@ -70,6 +70,7 @@ typedef struct AstNode {
             struct AstNode **stmt; // array of statment nodes
             int stmtCount;
             int isReturn;
+            bool hasOperators;
 
         } funcDef;
         
@@ -457,6 +458,41 @@ bool doesFunctionExist(const char* funcID) {
 return false;
 }
 
+bool hasOperatorInExpression(AstNode* node) {
+    if (!node) return false;
+
+    switch (node->type) {
+        case nodeExpression:
+        case nodeTerm:
+            // If the expression or term has an operator, return true
+            if (node->data.Expression.oper != NULL || node->data.term.oper != NULL) {
+                return true;
+            }
+
+            // Recursively check the left and right variables of the expression/term
+            if (hasOperatorInExpression(node->data.Expression.lVar) || 
+                hasOperatorInExpression(node->data.Expression.rVar)) {
+                return true;
+            }
+            break;
+
+        case nodeFactor:
+            // If it's a function call or nested expression, check that recursively
+            if (node->data.factor.funcCall) {
+                return hasOperatorInExpression(node->data.factor.funcCall);
+            } else if (node->data.factor.exp) {
+                return hasOperatorInExpression(node->data.factor.exp);
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    return false;
+}
+
+
 AstNode* pFactor() {
     printf("Entering pFactor()\n");
     AstNode* factorNode = NULL;
@@ -808,7 +844,17 @@ AstNode* pFuncDef() {
                 printf("Statment token: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
                 AstNode* stmtNode = pStmt();
                 funcDefNode->data.funcDef.stmt[funcDefNode->data.funcDef.stmtCount++] = stmtNode; // Parse statement
+
+                // check for if statements contain operators (necessary to know if functioncall is called in print later)
+                if (stmtNode->type == nodeExpression && stmtNode->data.Expression.oper != NULL) {
+                    funcDefNode->data.funcDef.hasOperators = true; // Found an operator
+                }
+                else if (stmtNode->type == nodeAssignment && hasOperatorInExpression(stmtNode->data.assignment.exp)) {
+                    funcDefNode->data.funcDef.hasOperators = true; // Found an operator in an assignment
+                }
                 printf("STMT COUNT: %d\n", funcDefNode->data.funcDef.stmtCount);
+                
+                // check for if return appears (aka is it void or is it int type function)
                 if (stmtNode->type == nodeReturn) {
                     funcDefNode -> data.funcDef.isReturn = 1;
                 }
@@ -822,7 +868,6 @@ AstNode* pFuncDef() {
                 pMoveToNextTkn(); // Move to next line
             } 
             else if (pCurrentTkn().type != TknTab) {
-                //loop back ig right?
             }
         }
     } 
@@ -830,6 +875,8 @@ AstNode* pFuncDef() {
         printf("! SYNTAX ERROR: Expected identifier for function name\n");
         exit(EXIT_FAILURE);
     }
+
+
 
     return funcDefNode; // Return the created function definition node
 }
@@ -976,40 +1023,6 @@ void writeCFile() {
     fclose(cFile);
 }
 
-bool hasOperatorInExpression(AstNode* node) {
-    if (!node) return false;
-
-    switch (node->type) {
-        case nodeExpression:
-        case nodeTerm:
-            // If the expression or term has an operator, return true
-            if (node->data.Expression.oper != NULL || node->data.term.oper != NULL) {
-                return true;
-            }
-
-            // Recursively check the left and right variables of the expression/term
-            if (hasOperatorInExpression(node->data.Expression.lVar) || 
-                hasOperatorInExpression(node->data.Expression.rVar)) {
-                return true;
-            }
-            break;
-
-        case nodeFactor:
-            // If it's a function call or nested expression, check that recursively
-            if (node->data.factor.funcCall) {
-                return hasOperatorInExpression(node->data.factor.funcCall);
-            } else if (node->data.factor.exp) {
-                return hasOperatorInExpression(node->data.factor.exp);
-            }
-            break;
-
-        default:
-            break;
-    }
-
-    return false;
-}
-
 
 // defining translation to rudimentaty C program
 void toC(AstNode* node) {
@@ -1107,23 +1120,25 @@ void toC(AstNode* node) {
             addToCodeBuffer(";\n");
             break;
 
-        case nodePrint:
-            addToCodeBuffer("printf(");
+case nodePrint:
+    addToCodeBuffer("printf(");
     
-            // Determine the format string based on whether the expression contains an operator
-            if (hasOperatorInExpression(node->data.stmt.data.print.exp)) {
-                addToCodeBuffer("\"%d\\n\"");  // Use integer format if there's an operator
-            }  else {
-                addToCodeBuffer("\"%f\\n\"");  // Use floating-point format if it's a single value
-            }
+ 
+        // Determine the format string based on whether the expression contains an operator
+        if (hasOperatorInExpression(node->data.stmt.data.print.exp)) {
+            addToCodeBuffer("\"%d\\n\"");  // Use integer format if there's an operator
+        } else {
+            addToCodeBuffer("\"%f\\n\"");  // Use floating-point format if it's a single value
+        }
     
-             addToCodeBuffer(", ");
+
+    addToCodeBuffer(", ");
     
-            // Output the full expression to the buffer
-            toC(node->data.stmt.data.print.exp);
+    // Output the full expression to the buffer
+    toC(node->data.stmt.data.print.exp);
     
-            addToCodeBuffer(");\n");
-            break;
+    addToCodeBuffer(");\n");
+    break;
 
         case nodeReturn:
             addToCodeBuffer("return ");
