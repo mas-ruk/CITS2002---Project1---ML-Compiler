@@ -108,6 +108,23 @@ void replAssi(const char* buffer, VarInf vars[], int varCount, char* outputBuffe
     }
 }
 
+void conductAssiReplace(const char* buffer) {
+    VarInf vars[MAX_LINES];
+    int varCount = 0;
+    int lineCount = findAssi(buffer, vars, &varCount);
+    checkVarPres(buffer, vars, varCount, lineCount);
+    char outputBuffer[BUFFER_SIZE];
+    replAssi(buffer, vars, varCount, outputBuffer);
+    
+    printf("%s\n", outputBuffer); 
+    
+    for (int i = 0; i < varCount; i++) {
+        free(vars[i].name);
+    }
+
+    
+}
+
 int main() {
     const char* buffer = "#include <stdio.h>\n"
                         "AssiType x;\n"
@@ -119,15 +136,7 @@ int main() {
                         "    return 0;\n"
                         "}\n";
 
-    VarInf vars[MAX_LINES];
-    int varCount = 0;
-    int lineCount = findAssi(buffer, vars, &varCount);
-    checkVarPres(buffer, vars, varCount, lineCount);
-    char outputBuffer[BUFFER_SIZE];
-    replAssi(buffer, vars, varCount, outputBuffer);
-    for (int i = 0; i < varCount; i++) {
-        free(vars[i].name);
-    }
+    conductAssiReplace(buffer);
 
     return 0;
 }
