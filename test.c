@@ -1042,6 +1042,13 @@ void toC(AstNode* node) {
         case nodeProgram:
             addToCodeBuffer("#include <stdio.h>\n\n");
 
+            // Generate variable declarations
+            for (int i = 0; i < variableCount; i++) {
+                addToCodeBuffer("AssiType ");
+                addToCodeBuffer(variableNames[i]);
+                addToCodeBuffer(";\n");
+            }
+
             // Flag to check if funcdef exists
             bool functionDefined = false;
             // First pass to collect global variable assignments
