@@ -1291,7 +1291,7 @@ for (int j = 0; j < node->data.program.lineCount; j++) {
                 }
                 toC(node->data.funcCall.args[i]);
             }
-            addToCodeBuffer(");\n"); 
+            addToCodeBuffer(")"); 
             //}
             break;
             }
