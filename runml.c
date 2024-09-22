@@ -166,8 +166,6 @@ void addToken(TknType type, const char *value) {
     strcpy(Tokens[TknIndex].value, value); // sets value 
     TknIndex++; // increases token index/position pointer
     TknCount++; // increment token count
-    print_token(Tokens[TknIndex - 1]);
-    printf("Creating Token - Type: %d, Value: '%s'\n", type, value); // debugging
 }
 
 // function to check validity of identifiers
@@ -256,13 +254,6 @@ void tokenize(const char *code) {
                 addToken(TknNumber, TempBuffer);
             }
 
-            /* check for invalid characters after the number
-            if (!isdigit(*pointer)) {
-                fprintf(stderr, "! Syntax Error: Invalid character '%c' after number.\n Recommendation: Check all numbers for invalid characters. Ensure all operators, identifiers, constants and words are properly seperated by spaces. \n", *pointer);
-                exit(1);
-            }
-            */
-
             // I think this may be the better way of checking for invalid characters after a number,
             // bc in ml its acceptable to find whitespaces after tokens -- but just double check LMAO
 
@@ -274,7 +265,6 @@ void tokenize(const char *code) {
 
         }
 
-        // check for strings (identifiers or reserved words)
         else if (isalpha(*pointer) && islower(*pointer)) { // alphabetical lower case only
             char TempBuffer[100] = {0};
             int i = 0;
@@ -282,15 +272,15 @@ void tokenize(const char *code) {
             TempBuffer[i++] = *pointer++; } 
             TempBuffer[i] = '\0'; // Null-terminate the buffer
 
-            if (strcmp(TempBuffer, "function") == 0) { // if function keyword exists
+            if (strcmp(TempBuffer, "function") == 0) { 
                 addToken(TknFunction, TempBuffer);
             }
-            else if (strcmp(TempBuffer, "print") == 0) { // if print keyword exists
+            else if (strcmp(TempBuffer, "print") == 0) { 
                 addToken(TknPrint, TempBuffer);
             } 
-            else if (strcmp(TempBuffer, "return") == 0) { // if return keyword exists
+            else if (strcmp(TempBuffer, "return") == 0) { 
                 addToken(TknReturn, TempBuffer);
-            } else if (strcmp(TempBuffer, "arg") == 0) { // command line argument variable
+            } else if (strcmp(TempBuffer, "arg") == 0) { 
                 pointer++;
                 if (isdigit(*pointer)) {
                     int j = 0;
@@ -414,7 +404,6 @@ char *strdup(const char *s) {
     return dup;
 }
 
-// Prototype for the parser functions
 AstNode* pFuncCall();
 AstNode* pExpression();
 AstNode* pProgram();
@@ -509,40 +498,30 @@ bool hasOperatorInExpression(AstNode* node) {
 
 
 AstNode* pFactor() {
-    printf("Entering pFactor()\n");
     AstNode* factorNode = NULL;
     
     // check for number existence
     if (pCurrentTkn().type == TknNumber) {
-        printf("Found number: %f\n", atof(pCurrentTkn().value));  // Use %f for double
         factorNode = createNode(nodeFactor);
         factorNode -> data.factor.constant = atof(pCurrentTkn().value);
         pMoveToNextTkn();
     }
     // check for float existence
     else if (pCurrentTkn().type == TknFloat) {
-        printf("Found number: %f\n", atof(pCurrentTkn().value));  // Use %f for double
         factorNode = createNode(nodeFactor);
-        printf("Created float node");
         factorNode -> data.factor.constant = atof(pCurrentTkn().value);
         pMoveToNextTkn();
     } 
     else if (pCurrentTkn().type == TknIdentifier) {
-        printf("Found identifier: %s\n", pCurrentTkn().value);
         // if function call
         if (doesFunctionExist(pCurrentTkn().value)) { 
             factorNode = createNode(nodeFactor);
             factorNode -> data.factor.funcCall = pFuncCall();
-            // Allow endline or other tokens after function call
-            if (pCurrentTkn().type == TknEnd) {
-                printf("Found endline after function call\n");
-            }
         }
         //not function call
         else    {
             factorNode = createNode(nodeFactor);
             factorNode -> data.factor.identifier = strdup(pCurrentTkn().value);
-            printf("Stored identifier: %s\n", factorNode->data.factor.identifier);
             pMoveToNextTkn();
             //if (pCurrentTkn().type != TknNewline && pCurrentTkn().type != TknEnd) {
             //    printf ("! SYNTAX ERROR: Expected new line after non-function name identifier\n.");
@@ -550,7 +529,6 @@ AstNode* pFactor() {
             //}
         }
     } else if (pCurrentTkn().type == TknLBracket) {
-        printf("Found left bracket\n");
         pMoveToNextTkn();
         factorNode = createNode(nodeFactor);
         // check stuff within the brackets 
@@ -559,7 +537,6 @@ AstNode* pFactor() {
                 printf("! SYNTAX ERROR: Invalid factor. Expected ')' after expression.\n");
                 exit(1);
             }    
-        printf("Found right bracket\n");
         pMoveToNextTkn(); // consume ')
         return factorNode;
         
@@ -569,13 +546,11 @@ AstNode* pFactor() {
         printf("! SYNTAX ERROR: Invalid factor. Expected functioncall, real constant, identifer or '(' expression ')'.\n.");
         exit(1);
     }
-    printf("Exiting pFactor()\n");
     return factorNode;
 }
 
 // creating that left right operator child tree
 AstNode* pTerm(){
-    printf("Entering pTerm()\n");    
     AstNode* fctrNode = pFactor(); // parse first factor
     // if is factor operator must parse recursively
 
@@ -584,12 +559,8 @@ AstNode* pTerm(){
         printf("! SYNTAX ERROR: Expected a valid factor.\n");
         return NULL; // Handle error
     }
-
-    printf("Parsed factor: %f\n", fctrNode->data.factor.constant); 
-
     while (pCurrentTkn().type == TknFactorOperator) {
         char* oper = strdup(pCurrentTkn().value); // store oper
-        printf("Found multiplication/division operator: '%s'\n", oper);
 
 
         pMoveToNextTkn(); // move to next token
@@ -608,12 +579,10 @@ AstNode* pTerm(){
         termNode -> data.term.oper = oper; // operator assigned as well
         fctrNode = termNode; 
     } 
-    printf("Exiting pTerm()\n");
     return fctrNode;
 }
 
 AstNode* pExpression(){
-    printf("Entering pExpression() with current node %s\n", pCurrentTkn().value);
     AstNode* termNode = pTerm(); // parse first term
     if (!termNode) {
         printf("! SYNTAX ERROR: Expected a valid term.\n");
@@ -622,8 +591,6 @@ AstNode* pExpression(){
     
     while (pCurrentTkn().type == TknTermOperator) {
         char* oper = strdup(pCurrentTkn().value);
-        printf("Found term operator: '%s'\n", oper);
-
         pMoveToNextTkn();
         AstNode* rVarNode = pExpression();
 
@@ -641,30 +608,23 @@ AstNode* pExpression(){
         termNode = exprNode;
     
     } 
-    printf("Exiting pExpression()\n");
     return termNode;
 }
 
 #define MAX_ARGS 1000
 AstNode* pFuncCall() {
-    printf("Entering pFuncCall()\n");
     AstNode* funcCallNode = createNode(nodeFunctionCall);
 
     // Consume (EDIT: STORE) the function name
     if (pCurrentTkn().type == TknLBracket) {
     funcCallNode -> data.funcCall.identifier = strdup(Tokens[pCurrentTknIndex -1].value);
     printf("FumcCall: %s\n", funcCallNode->data.funcCall.identifier);
-
     }
     else {
     funcCallNode -> data.funcCall.identifier = strdup(Tokens[pCurrentTknIndex].value);
     printf("FumcCall: %s\n", funcCallNode->data.funcCall.identifier);
     }
-
-    pMoveToNextTkn(); // function identifier eaten
-
-    printf("Token currently: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
-    
+    pMoveToNextTkn(); // function identifier eaten    
     // throwing errors so lets do some malloc bullcrap
     funcCallNode -> data.funcCall.args = malloc(sizeof(AstNode*) * MAX_ARGS);
     funcCallNode -> data.funcCall.argCount = 0;
@@ -682,14 +642,10 @@ AstNode* pFuncCall() {
     if (pCurrentTkn().type == TknRBracket) {
         break;  // End of arguments
     } else if (pCurrentTkn().type == TknEnd || pCurrentTkn().type == TknNewline) {
-        printf("! WARNING: Unexpected end or newline in function call arguments.\n");
+        printf("! SYNTAX ERROR: Unexpected end or newline in function call arguments.\n");
         break;  // Exit early if we hit an end or newline
     }
-
-    // Debugging output to check current token
-    printf("Current token before pExpression: %s\n", Tokens[pCurrentTknIndex].value);
-
-    // Parse the expression
+    // Parse 
     AstNode* paramNode = pExpression();
     if (paramNode) {
         funcCallNode->data.funcCall.args[funcCallNode->data.funcCall.argCount++] = paramNode;
@@ -706,13 +662,9 @@ AstNode* pFuncCall() {
         exit(1);
     }
 }
-
-    printf("Token after ID: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
-
     // Check for the right parenthesis ')'
     if (pCurrentTkn().type == TknRBracket) {
          pMoveToNextTkn();  // Consume ')'} 
-        printf("! DEBUGGING SHIT: Token after ID: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
         return funcCallNode;
         
     } else {
@@ -735,22 +687,18 @@ void addVariable(const char* name) {
 
 // parsing over statements
 AstNode* pStmt() {
-    printf("Entering pStmt() with node of type %d\n", pCurrentTkn().type);
     AstNode* stmtNode = createNode(nodeStmt);
     
     switch (pCurrentTkn().type) {
-        case TknIdentifier:
-            printf("Detected identifier: '%s'\n", pCurrentTkn().value); // debug
-            
+        case TknIdentifier:            
             if (doesFunctionExist(pCurrentTkn().value)) {
-                printf("Function call detected for: '%s'\n", pCurrentTkn().value); // debug
                 // stmtNode -> data.stmt.data.funcCall;
                 stmtNode->data.stmt.data.funcCall.identifier = strdup(pCurrentTkn().value);
                 pMoveToNextTkn(); // consume identifier
 
 //identical to function call but need repeat for reasons
                 
-                // throwing errors so lets do some malloc bullcrap
+                // throwing errors so lets do some malloc 
                 stmtNode -> data.stmt.data.funcCall.args = malloc(sizeof(AstNode*) * MAX_ARGS);
                 stmtNode -> data.stmt.data.funcCall.argCount = 0;
 
@@ -771,17 +719,13 @@ AstNode* pStmt() {
                     break;  // Exit early if we hit an end or newline
                 }
 
-                // Debugging output to check current token
-                printf("INSIDE Current token before pExpression: %s\n", Tokens[pCurrentTknIndex].value);
-
-
                 // Parse the expression
                 AstNode* paramNode = pExpression();
                 if (paramNode) {
                     stmtNode->data.stmt.data.funcCall.args[stmtNode->data.stmt.data.funcCall.argCount++] = paramNode;
                 } else {
-                     printf("! SYNTAX ERROR: Invalid factor. Expected valid expression.\n");
-                     exit(1);
+                    printf("! SYNTAX ERROR: Invalid factor. Expected valid expression.\n");
+                    exit(1);
                 }
 
                 // Check for additional parameters
@@ -792,14 +736,9 @@ AstNode* pStmt() {
                     exit(1);
                 }
                 }
-
-                printf("INSIDE Token after ID: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
-
                 // Check for the right parenthesis ')'
                 if (pCurrentTkn().type == TknRBracket) {
-                    pMoveToNextTkn();  // Consume ')'} 
-                    printf("! INSIDE DEBUGGING SHIT: Token after ID: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
-        
+                    pMoveToNextTkn();  // Consume ')'}         
                 } else {
                     printf("! SYNTAX ERROR: Expected ')' after function parameters.\n");
                     exit(1);
@@ -809,16 +748,13 @@ AstNode* pStmt() {
                 stmtNode->type = nodeFunctionCall;
                 break;
             } else {
-                printf("Assignment detected for: '%s'\n", pCurrentTkn().value); // debug
                 // assignment
                 addVariable(pCurrentTkn().value);
                 stmtNode -> data.stmt.data.assignment.identifier = strdup(pCurrentTkn().value); // store identifier
                 pMoveToNextTkn(); // move to next token
-                printf("Current token after identifier: '%s' (Type: %d)\n", pCurrentTkn().value, pCurrentTkn().type);
                 
                 //check assignment operator correctly exists here
                 if (pCurrentTkn().type == TknAssignmentOperator) {
-                    printf("Assignment operator '<-' detected.\n");
                     pMoveToNextTkn(); // consume the assignment operator
                     
                     stmtNode -> data.stmt.data.assignment.exp = pExpression();
@@ -864,8 +800,6 @@ AstNode* pStmt() {
             printf("! SYNTAX ERROR: Unexpected token. valid statement starting args include print, return and function calls.");
             exit(EXIT_FAILURE);
     }
-
-    printf("Exiting pStmt()\n");
     return stmtNode;
 }
 
@@ -875,51 +809,42 @@ AstNode* pStmt() {
 AstNode* pFuncDef() {
     printf("Entering pFuncDef()\n");
 
-    // Create a new function definition node
     AstNode* funcDefNode = createNode(nodeFunctionDef);
-    pMoveToNextTkn();  // Move to the next token after 'function' keyword
+    pMoveToNextTkn();  
 
-    // Check if a valid function name (identifier) is provided
     if (pCurrentTkn().type == TknIdentifier) {
         if (doesFunctionExist(pCurrentTkn().value)) {
             printf("! SYNTAX ERROR: Function name '%s' is already defined\n", pCurrentTkn().value);
             exit(EXIT_FAILURE);
         }
 
-        // Store function name in the function definition node
         addFunctionName(pCurrentTkn().value);
         funcDefNode->data.funcDef.identifier = strdup(pCurrentTkn().value);
 
-        // Allocate memory for function parameters
         funcDefNode->data.funcDef.params = (char**)malloc(sizeof(char*) * MAX_PARAMS);
         funcDefNode->data.funcDef.paramCount = 0;
-        pMoveToNextTkn();  // Move to parameters
+        pMoveToNextTkn();  // move to parameters
 
-        // Parse the function parameters (if any)
         while (pCurrentTkn().type == TknIdentifier) {
             if (funcDefNode->data.funcDef.paramCount >= MAX_PARAMS) {
                 printf("! SYNTAX ERROR: Too many parameters in function definition\n");
                 exit(EXIT_FAILURE);
             }
-
-            // Add the identifier as a parameter to the function
             funcDefNode->data.funcDef.params[funcDefNode->data.funcDef.paramCount++] = strdup(pCurrentTkn().value);
-            pMoveToNextTkn();  // Move to the next parameter
+            pMoveToNextTkn();  // move to the next param
         }
 
-        // Ensure there is a newline after the function name and parameters
+        // newline after the function name and parameters?
         if (pCurrentTkn().type != TknNewline) {
             printf("! SYNTAX ERROR: Expected newline after function definition\n");
             exit(EXIT_FAILURE);
         }
         pMoveToNextTkn();  // Move past the newline
 
-        // Parse the function body, which consists of indented statements
         funcDefNode->data.funcDef.stmt = (AstNode**)malloc(sizeof(AstNode*) * MAX_STATEMENTS);
         funcDefNode->data.funcDef.stmtCount = 0;
-        funcDefNode->data.funcDef.isReturn = 0;  // Initialize to indicate no return statement yet
+        funcDefNode->data.funcDef.isReturn = 0;  
 
-        // Parse the statements inside the function body
         while (pCurrentTkn().type == TknTab) {
             pMoveToNextTkn();  // Move past the tab (indentation)
 
@@ -959,9 +884,7 @@ AstNode* pFuncDef() {
     return funcDefNode;  // Return the created function definition node
 }
 
-
 AstNode* pProgItem() {
-    printf("Entering pProgItem()\n");
     // handle newlines (skip and continue)
     while (pCurrentTkn().type == TknNewline) {
         pMoveToNextTkn();
@@ -987,10 +910,8 @@ AstNode* pProgItem() {
         }
         return stmtNode;
     } else if (pCurrentTkn().type == TknEnd) {
-        // End of program, no further tokens expected
         return NULL;
     } else if (pCurrentTkn().type == TknTab) {
-            printf("! Detected Tab as start of program item");
             exit(EXIT_FAILURE);
     } else {
         // handle unexpected tokens
@@ -1001,7 +922,6 @@ AstNode* pProgItem() {
 
 #define MAX_LINES 10000
 AstNode* pProgram() {
-    printf("Entering pProgram()\n");
     AstNode* programNode = createNode(nodeProgram);
     
     // line count
@@ -1049,7 +969,6 @@ void initBuffer() {
     codeBuffer[0] = '\0'; // Start with an empty string
 }
 
-/// Append string to buffer
 void addToCodeBuffer(const char* str) {
     int len = strlen(str);
     if (bufferLength + len >= BUFFER_SIZE) {
@@ -1074,7 +993,7 @@ const char* getExpStr(AstNode* expr) {
 
     switch (expr->type) {
         case nodeFactor:
-            snprintf(buffer, sizeof(buffer), "%s", expr->data.factor.identifier); // Adjust as needed
+            snprintf(buffer, sizeof(buffer), "%s", expr->data.factor.identifier); 
             break;
         case nodeExpression:
             snprintf(buffer, sizeof(buffer), "%s %s %s",
@@ -1085,7 +1004,6 @@ const char* getExpStr(AstNode* expr) {
         default:
             break;
     }
-    printf("Generated expression: %s\n", buffer); 
     return buffer;
 }
 
@@ -1103,7 +1021,6 @@ void writeCFile() {
 bool containsFunctionCall(AstNode* node) {
     if (!node) return false;
 
-    // Check if the current node is a function call
     if (node->type == nodeFunctionCall) {
         return true;
     }
@@ -1159,7 +1076,6 @@ void toC(AstNode* node) {
                 else if (node->data.program.programItems[i]->type == nodeFunctionDef) {
                     functionDefined = true;
                     toC(node->data.program.programItems[i]);
-  
                 }
             }
 
@@ -1167,21 +1083,20 @@ void toC(AstNode* node) {
             addToCodeBuffer("int main(int argc, char *argv[]) {\n");
             bool hasReturn = false; // flag to track if a return statement is made in main
 
-            // Process all statements that should be executed in main
 for (int j = 0; j < node->data.program.lineCount; j++) {
     if (node->data.program.programItems[j]->type == nodePrint) { // Handle print statements
         toC(node->data.program.programItems[j]);
-    } else if (node->data.program.programItems[j]->type == nodeAssignment) { // Handle assignments
+    } 
+    else if (node->data.program.programItems[j]->type == nodeAssignment) { // Handle assignments
         toC(node->data.program.programItems[j]);
-    } else if (node->data.program.programItems[j]->type == nodeReturn) { // Handle return statements
+    } 
+    else if (node->data.program.programItems[j]->type == nodeReturn) { // Handle return statements
         toC(node->data.program.programItems[j]);
         hasReturn = true;
     } else if (node->data.program.programItems[j]->type == nodeFunctionCall) { // Handle function calls in main
-        printf("detected functioncall in stmt interpreter");
         toC(node->data.program.programItems[j]);
     }
 }
-            // Only add return 0 if no return statement has been encountered
             if (!hasReturn) {
                 addToCodeBuffer("    return 0;\n");
             }
@@ -1203,7 +1118,7 @@ for (int j = 0; j < node->data.program.lineCount; j++) {
             addToCodeBuffer("(");
 
             for (int i = 0; i < node->data.funcDef.paramCount; i++) {
-                if (i > 0) addToCodeBuffer(", "); // need to change
+                if (i > 0) addToCodeBuffer(", "); 
                     addToCodeBuffer("int ");
                     addToCodeBuffer(node->data.funcDef.params[i]);
             }
@@ -1227,67 +1142,44 @@ for (int j = 0; j < node->data.program.lineCount; j++) {
         case nodePrint:
             addToCodeBuffer("printf(");
 
-            // Check if the expression contains a function call
             if (containsFunctionCall(node->data.stmt.data.print.exp)) {
-                // You can determine the format based on your specific rules here
-                addToCodeBuffer("\"%d\\n\"");  // we can assume that if a functioncall exists, the function performs a mathematical operation
+                addToCodeBuffer("\"%d\\n\"");  
             } else {
                 // Regular expression handling
                 if (hasOperatorInExpression(node->data.stmt.data.print.exp)) {
-                    addToCodeBuffer("\"%d\\n\"");  // Use integer format if there's an operator
+                    addToCodeBuffer("\"%d\\n\"");  
                 } else {
-                    addToCodeBuffer("\"%f\\n\"");  // Use floating-point format if it's a single value
-                }
+                    addToCodeBuffer("\"%f\\n\"");  
             }
-
+        }
             addToCodeBuffer(", ");
-
-            // Output the full expression to the buffer
             toC(node->data.stmt.data.print.exp);
-    
             addToCodeBuffer(");\n");
-             break;
-
+            break;
         case nodeReturn:
             addToCodeBuffer("return ");
             toC(node->data.stmt.data.returnStmt.exp);
             addToCodeBuffer(";\n");
             break;
-
         case nodeExpression:
-            // Process the left side of the term
-            toC(node->data.Expression.lVar);  // Left-hand side of the term (could be a factor)
+            toC(node->data.Expression.lVar);  
     
-            // Add the operator (if any)
             if (node->data.Expression.oper != NULL) {
-                addToCodeBuffer(node->data.Expression.oper);  // The operator (like *, /)
-            }
-    
-            // Process the right side of the term (if there is one)
-            if (node->data.Expression.rVar != NULL) {
-                toC(node->data.Expression.rVar);  // Right-hand side of the term
-            }
-    
-            break;
-
+                addToCodeBuffer(node->data.Expression.oper); 
+        } if (node->data.Expression.rVar != NULL) {
+            toC(node->data.Expression.rVar);  
+        } break;
         case nodeTerm:
-            // Process the left side of the term
-            toC(node->data.term.lVar);  // Left-hand side of the term (could be a factor)
-    
-            // Add the operator (if any)
+            toC(node->data.term.lVar);  
             if (node->data.term.oper != NULL) {
-                addToCodeBuffer(node->data.term.oper);  // The operator (like *, /)
+                addToCodeBuffer(node->data.term.oper);  
             }
-    
-            // Process the right side of the term (if there is one)
             if (node->data.term.rVar != NULL) {
-                toC(node->data.term.rVar);  // Right-hand side of the term
+                toC(node->data.term.rVar);  
             }
-    
             break;
-
         case nodeFunctionCall: 
-            if(node->data.funcCall.identifier == NULL) { // statement function call exists here
+            if(node->data.funcCall.identifier == NULL) { 
                 addToCodeBuffer(node->data.stmt.data.funcCall.identifier);
                 addToCodeBuffer("(");
                 for (int i = 0; i < node->data.stmt.data.funcCall.argCount; i++) {
@@ -1296,8 +1188,7 @@ for (int j = 0; j < node->data.program.lineCount; j++) {
                 }
                 toC(node->data.stmt.data.funcCall.args[i]);
                 }
-                 addToCodeBuffer(");\n"); 
-                //}
+                addToCodeBuffer(");\n"); 
                 break;
             }
             else {
@@ -1310,22 +1201,21 @@ for (int j = 0; j < node->data.program.lineCount; j++) {
                 toC(node->data.funcCall.args[i]);
             }
             addToCodeBuffer(")"); 
-            //}
             break;
             }
 
         case nodeFactor:
-            if (node->data.factor.identifier) { // identifier exists
+            if (node->data.factor.identifier) { 
                 addToCodeBuffer(node->data.factor.identifier);
             }
-            else if (node->data.factor.funcCall) { // else if function call exists
+            else if (node->data.factor.funcCall) { 
                 toC(node->data.factor.funcCall);
             }
-            else if (node->data.factor.exp) { // if expression exists
+            else if (node->data.factor.exp) { 
                 toC(node->data.factor.exp);
             }
-            else { // otherwise treat as constant
-                char buffer[50]; // Adjust size as needed
+            else { 
+                char buffer[50]; 
                 snprintf(buffer, sizeof(buffer), "%.6f", node->data.factor.constant);
                 addToCodeBuffer(buffer);
             }
@@ -1338,81 +1228,106 @@ for (int j = 0; j < node->data.program.lineCount; j++) {
 }
 
 // ---------------------------------- REPLACING ASSITYPE ------------------------------//
+
+// init struct to store var names and wheth they been operated on
 typedef struct {
     char* name;
     int operated; // 1 (true) and 0 (false)
 } VarInf;
-int isVarFound(const char* line, const char* variable) {
+
+// boolean func 
+int isVarFound(const char* line, const char* vari) {
     const char* pos = line;
-    size_t varLen = strlen(variable);
-    while ((pos = strstr(pos, variable))) {
+    size_t varLen = strlen(vari);
+    while ((pos = strstr(pos, vari))) {
         char before = (pos == line) ? ' ' : *(pos - 1);
         char after = *(pos + varLen);
-        if ((before == ' ' || before == '=' || before == '(' || before == ',' || before == ';' || before == '\0') &&
-            (after == ' ' || after == '=' || after == ')' || after == ',' || after == ';' || after == '\0')) {
+        if ((before == ' ' 
+        || before == '=' 
+        || before == '(' 
+        || before == ',' 
+        || before == ';' 
+        || before == '\0') &&
+            (after == ' ' 
+            || after == '=' 
+            || after == ')' 
+            || after == ',' 
+            || after == ';' 
+            || after == '\0')) {
             return 1; 
             }
         pos += varLen;
         }
     return 0; 
 }
+
+// will take code and then extract variables in that code with AssiType before it
 int findAssi(const char* buffer, VarInf vars[], int* varCount) {
+    char* buffCpy = strdup(buffer); // duplicate buffer to maintain integrity of orig
+    // init count var
+    int lineCount = 0; 
+    // init lines array
     char* lines[MAX_LINES];
-    int lineCount = 0;
-    
-    char* bufferCopy = strdup(buffer);
-    if (!bufferCopy) {
+    // if we cant copy the buffer we've run out of memory rip
+    if (!buffCpy) {
         fprintf(stderr, "Memory allocation failed\n");
         return -1;
-    }
-    char* line = strtok(bufferCopy, "\n");
+}
+    // tokenise each str
+    char* line = strtok(buffCpy, "\n");
+    // from there we add each line into the array and we keep track of how many lines stored
     while (line) {
         lines[lineCount++] = line;
         line = strtok(NULL, "\n");
     }
+
     for (int i = 0; i < lineCount; i++) {
         char* pos = strstr(lines[i], "AssiType ");
         if (pos && (strchr(pos, ';') != NULL)) {
             char* varName = malloc(13); // 12 letters + whitespace
             sscanf(pos, "AssiType %12[^; ]", varName);
-            
             vars[*varCount].name = varName;
             vars[*varCount].operated = 0; 
             (*varCount)++;
         }
     }
-    free(bufferCopy);
+    free(buffCpy);
     return lineCount;
 }
+
 void checkVarPres(const char* buffer, VarInf vars[], int varCount, int lineCount) {
     char* lines[MAX_LINES];
     char* bufferCopy = strdup(buffer);
+    
     if (!bufferCopy) {
         fprintf(stderr, "Memory allocation failed\n");
         return;
     }
+
     char* line = strtok(bufferCopy, "\n");
     int i = 0;
+    
     while (line) {
         lines[i++] = line;
         line = strtok(NULL, "\n");
     }
-    for (int v = 0; v < varCount; v++) {
+
+    for (int j = 0; j < varCount; j++) {
         for (int i = 0; i < lineCount; i++) {
-            if (isVarFound(lines[i], vars[v].name)) {
+            if (isVarFound(lines[i], vars[j].name)) {
                 if (strstr(lines[i], "=")) {
                     char* assignment = strchr(lines[i], '=');
                     if (assignment) {
                         char value[BUFFER_SIZE];
                         sscanf(assignment + 1, "%s", value); 
                         if (strchr(value, '.')) {
-                            vars[v].operated = 1;
+                            vars[j].operated = 1;
                         }
                     }
                 }
                 if (strstr(lines[i], "+") || strstr(lines[i], "-") || 
                     strstr(lines[i], "*") || strstr(lines[i], "/")) {
-                    vars[v].operated = 1; 
+                    vars[j].operated = 1; 
                 }
             }
         }
@@ -1420,36 +1335,32 @@ void checkVarPres(const char* buffer, VarInf vars[], int varCount, int lineCount
     free(bufferCopy);
 }
 
-void replAssi(const char* buffer, VarInf vars[], int varCount, char* outputBuffer) {
-    strcpy(outputBuffer, buffer); 
+void replAssi(const char* buffer, VarInf vars[], int varCount, char* outBuff) {
+    
+    strcpy(outBuff, buffer); 
+    
     for (int v = 0; v < varCount; v++) {
         if (vars[v].operated) {
             char oldString[BUFFER_SIZE];
             sprintf(oldString, "AssiType %s", vars[v].name);
             char newString[BUFFER_SIZE];
             sprintf(newString, "%s %s", vars[v].operated ? "float" : "int", vars[v].name);
-            char* pos = outputBuffer;
+            char* pos = outBuff;
             while ((pos = strstr(pos, oldString))) {
                 strncpy(pos, newString, strlen(newString));
                 memmove(pos + strlen(newString), pos + strlen(oldString), strlen(pos + strlen(oldString)) + 1);
                 pos += strlen(newString); 
             }
         }
-    }
 }
-
-
+}
 char outputBuffer[BUFFER_SIZE];
-
 void conductAssiReplace(const char* buffer) {
     VarInf vars[MAX_LINES];
     int varCount = 0;
     int lineCount = findAssi(buffer, vars, &varCount);
     checkVarPres(buffer, vars, varCount, lineCount);
-    replAssi(buffer, vars, varCount, outputBuffer);
-    
-    printf("%s\n", outputBuffer); 
-    
+    replAssi(buffer, vars, varCount, outputBuffer); 
     for (int i = 0; i < varCount; i++) {
         free(vars[i].name);
     }
@@ -1468,9 +1379,7 @@ void cleanupAfterExec() {
     remove("mlProgram");
 }
 
-
 double commandLineArgs[MAX_ARGS];  // Array to hold real-valued arguments
-
 void parseCommandLineArgs(int argc, char *argv[]) {
     for (int i = 0; i < argc - 1 && i < MAX_ARGS; i++) {
         commandLineArgs[i] = atof(argv[i + 1]);  // Convert argument to float
@@ -1483,10 +1392,7 @@ void parseCommandLineArgs(int argc, char *argv[]) {
     }
 }
 
-// ######### FUCK THIS MAN ########
-
-
-   int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
     // error checking, if no. of args is less than 2 
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <filename.ml>\n", argv[0]); // changed to fprintf to print to stderr instead of default data stream
@@ -1514,13 +1420,6 @@ void parseCommandLineArgs(int argc, char *argv[]) {
     }
     pCurrentTknIndex = 0;
 
-
-    // debugging tokens
-    printf("Tokens after tokenisation\n");
-    for (int i = 0; i < TknIndex; i++) {
-        print_token(Tokens[i]);
-    }
-
     // Parse the code and build the AST
     AstNode* result = pProgram(); 
     if (result != NULL) {
@@ -1528,9 +1427,6 @@ void parseCommandLineArgs(int argc, char *argv[]) {
         // Convert the AST to C code
         toC(result);
         
-        // Print the generated C code (for debugging)
-        printf("Generated C code:\n%s\n", codeBuffer);
-
         conductAssiReplace(codeBuffer);
 
         // Write the generated C code to a file
@@ -1539,13 +1435,12 @@ void parseCommandLineArgs(int argc, char *argv[]) {
             fputs(outputBuffer, cFile);
             fclose(cFile);
         } else {
-            printf("Error writing C file.\n");
+            fprintf(stderr, "@ ERROR: Error writing C file.\n");
             return 1;
         }
 
-        printf("Test passed!\n");
     } else {
-        printf("Test failed!\n");
+        fprintf(stderr, "@ ERROR: Test failed!\n");
     }
     
     compileAndRunInC();
