@@ -1,3 +1,2 @@
-# This program prints the number 42
-
-print 42.0
+x <- 2.5
+print x
