@@ -1343,33 +1343,34 @@ void checkVarPres(const char* buffer, VarInf vars[], int varCount, int lineCount
 }
 
 void replAssi(const char* buffer, VarInf vars[], int varCount, char* outBuff) {
-    
+    // copy input buff
     strcpy(outBuff, buffer); 
-    
-    for (int v = 0; v < varCount; v++) {
-        if (vars[v].operated) {
-            char oldString[BUFFER_SIZE];
-            sprintf(oldString, "AssiType %s", vars[v].name);
-            char newString[BUFFER_SIZE];
-            sprintf(newString, "%s %s", vars[v].operated ? "float" : "int", vars[v].name);
-            char* pos = outBuff;
-            while ((pos = strstr(pos, oldString))) {
-                strncpy(pos, newString, strlen(newString));
-                memmove(pos + strlen(newString), pos + strlen(oldString), strlen(pos + strlen(oldString)) + 1);
-                pos += strlen(newString); 
+    // iter over vars in array 
+    for (int varIter = 0; varIter < varCount; varIter++) {
+        if (vars[varIter].operated) {
+            char oldStr[BUFFER_SIZE];
+            sprintf(oldStr, "AssiType %s", vars[varIter].name); // make str to use as search for assitype
+            char newStr[BUFFER_SIZE];
+            sprintf(newStr, "%s %s", vars[varIter].operated ? "float" : "int", vars[varIter].name);
+            char* pl = outBuff;
+            // hell of a loop but basically grabs old string and replaces it with new and then shifts and updates pl of chars
+            while ((pl = strstr(pl, oldStr))) {
+                    strncpy(pl, newStr, strlen(newStr));
+                    memmove(pl + strlen(newStr), pl + strlen(oldStr), strlen(pl + strlen(oldStr)) + 1);
+                    pl += strlen(newStr); 
             }
         }
 }
 }
-char outputBuffer[BUFFER_SIZE];
+char outBuff[BUFFER_SIZE];
 void conductAssiReplace(const char* buffer) {
     VarInf vars[MAX_LINES];
     int varCount = 0;
     int lineCount = findAssi(buffer, vars, &varCount);
     checkVarPres(buffer, vars, varCount, lineCount);
-    replAssi(buffer, vars, varCount, outputBuffer); 
-    for (int i = 0; i < varCount; i++) {
-        free(vars[i].name);
+    replAssi(buffer, vars, varCount, outBuff); 
+    for (int varIter = 0; varIter < varCount; varIter++) {
+        free(vars[varIter].name);
     }
 }
 
@@ -1439,7 +1440,7 @@ int main(int argc, char *argv[]) {
         // Write the generated C code to a file
         FILE *cFile = fopen("mlProgram.c", "w");
         if (cFile != NULL) {
-            fputs(outputBuffer, cFile);
+            fputs(outBuff, cFile);
             fclose(cFile);
         } else {
             fprintf(stderr, "@ ERROR: Error writing C file.\n");
