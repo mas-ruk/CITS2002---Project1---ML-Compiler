@@ -1282,13 +1282,14 @@ int findAssi(const char* buffer, VarInf vars[], int* varCount) {
     char* tLine = strtok(buffCpy, "\n");
     // from there we add each line into the array and we keep track of how many lines stored
     while (tLine) {
-        lines[lineCount++] = tLine;
+        lines[lineCount++] = tLine; // tokenised line added to array
         tLine = strtok(NULL, "\n");
     }
-
     for (int lineIter = 0; lineIter < lineCount; lineIter++) {
+        // within current line AssiType searched
         char* pl = strstr(lines[lineIter], "AssiType ");
         if (pl && (strchr(pl, ';') != NULL)) {
+            // if found and semicolon present give memory
             char* varName = malloc(13); // 12 letters + whitespace
             sscanf(pl, "AssiType %12[^; ]", varName);
             vars[*varCount].name = varName;
@@ -1301,43 +1302,44 @@ int findAssi(const char* buffer, VarInf vars[], int* varCount) {
 }
 
 void checkVarPres(const char* buffer, VarInf vars[], int varCount, int lineCount) {
+    // same as above
     char* lines[MAX_LINES];
-    char* bufferCopy = strdup(buffer);
-    
-    if (!bufferCopy) {
+    char* buffCpy = strdup(buffer);
+    // mem alloc check
+    if (!buffCpy) {
         fprintf(stderr, "Memory allocation failed\n");
         return;
     }
-
-    char* line = strtok(bufferCopy, "\n");
-    int i = 0;
+    // tokenised again
+    char* tLine = strtok(buffCpy, "\n");
+    int iter = 0;
     
-    while (line) {
-        lines[i++] = line;
-        line = strtok(NULL, "\n");
+    while (tLine) {
+        lines[iter++] = tLine;
+        tLine = strtok(NULL, "\n");
     }
-
-    for (int j = 0; j < varCount; j++) {
-        for (int i = 0; i < lineCount; i++) {
-            if (isVarFound(lines[i], vars[j].name)) {
-                if (strstr(lines[i], "=")) {
-                    char* assignment = strchr(lines[i], '=');
-                    if (assignment) {
-                        char value[BUFFER_SIZE];
-                        sscanf(assignment + 1, "%s", value); 
-                        if (strchr(value, '.')) {
-                            vars[j].operated = 1;
-                        }
-                    }
-                }
-                if (strstr(lines[i], "+") || strstr(lines[i], "-") || 
-                    strstr(lines[i], "*") || strstr(lines[i], "/")) {
-                    vars[j].operated = 1; 
+    // var if there 
+    for (int varIter = 0; varIter < varCount; varIter++) {
+    for (int lineIter = 0; lineIter < lineCount; lineIter++) { // checks var in currLine
+    if (isVarFound(lines[lineIter], vars[varIter].name)) {
+        if (strstr(lines[lineIter], "=")) { // is assign?
+            char* assi = strchr(lines[lineIter], '=');
+            if (assi) {
+                char value[BUFFER_SIZE];
+                sscanf(assi + 1, "%s", value); 
+                if (strchr(value, '.')) { // is float?
+                    vars[varIter].operated = 1;
                 }
             }
         }
+        if (strstr(lines[lineIter], "+") || strstr(lines[lineIter], "-") || 
+            strstr(lines[lineIter], "*") || strstr(lines[lineIter], "/")) {
+            vars[varIter].operated = 1; 
+        }
     }
-    free(bufferCopy);
+    }
+    }
+    free(buffCpy);
 }
 
 void replAssi(const char* buffer, VarInf vars[], int varCount, char* outBuff) {
