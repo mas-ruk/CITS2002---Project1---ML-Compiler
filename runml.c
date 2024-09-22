@@ -13,6 +13,7 @@
 #define MY_SIZE 1000
 #define MAX_NODES 1000
 
+
 // initalise different token types for our lexer, values described in comments
 typedef enum { 
     TknIdentifier, 
@@ -29,7 +30,8 @@ typedef enum {
     TknLBracket, // "(" 
     TknRBracket, // ")"
     TknComma, // ","
-    TknEnd // "END" 
+    TknEnd, // "END" 
+    TknArg // arg0, arg1, etc.
 } TknType;
 
 // define structure for "Token" as a 'type' and 'value' pair
@@ -117,6 +119,7 @@ typedef struct AstNode {
         struct {
             float constant; // using float as we only require 6 digits of prec
             char* identifier;
+            char* argfunc;
             struct AstNode *funcCall;
             struct AstNode *exp; // expressions in parentheses
         } factor;
@@ -145,6 +148,37 @@ typedef struct AstNode {
         } returnStmt;
     } data;
 } AstNode;
+
+
+#define MAX_FARGS 100
+
+char *args[MAX_FARGS];
+
+typedef struct {
+    char *args[MAX_FARGS]; // Array to store unique args
+    int count; // Number of unique args
+} UniqueArgs;
+
+void collectUniqueArgs(Token *tokens, int tokenCount, UniqueArgs *uniqueArgs) {
+    uniqueArgs->count = 0; // Initialize count to 0
+
+    for (int i = 0; i < tokenCount; i++) {
+        if (tokens[i].type == TknArg) {
+            // Check if the arg already exists in uniqueArgs
+            int exists = 0;
+            for (int j = 0; j < uniqueArgs->count; j++) {
+                if (strcmp(uniqueArgs->args[j], tokens[i].value) == 0) {
+                    exists = 1; // Arg already exists
+                    break;
+                }
+            }
+            // If it doesn't exist, add it to the uniqueArgs
+            if (!exists && uniqueArgs->count < MAX_FARGS) {
+                uniqueArgs->args[uniqueArgs->count++] = strdup(tokens[i].value);
+            }
+        }
+    }
+}
 
 // ###################################### TOKENISATION START ######################################
 
@@ -279,10 +313,30 @@ void tokenize(const char *code) {
             char TempBuffer[100] = {0};
             int i = 0;
             while (isalnum(*pointer)|| *pointer == '_') { // more general isalnum() allows for us to pass invalid strings into identifier checker, meaning that this specific error can be accurately flagged
-            TempBuffer[i++] = *pointer++; } 
+                TempBuffer[i++] = *pointer++; 
+            } 
             TempBuffer[i] = '\0'; // Null-terminate the buffer
 
-            if (strcmp(TempBuffer, "function") == 0) { // if function keyword exists
+            // Check if the identifier starts with "arg"
+            if (strncmp(TempBuffer, "arg", 3) == 0) {
+            // After "arg", ensure the remaining characters are digits
+                int isValidArg = 1;
+                for (int j = 3; TempBuffer[j] != '\0'; j++) {
+                    if (!isdigit(TempBuffer[j])) {
+                        isValidArg = 0;
+                        break;
+                }
+            }   
+                if (isValidArg) {
+            // If valid, create a TknArg token and store the full "argX" value
+                    addToken(TknArg, TempBuffer); // Use the new token type for argX
+                    argsCount++;
+                } else {
+                fprintf(stderr, "! Syntax Error: Invalid identifier after 'arg'.\n");
+                exit(1);
+                }
+            }
+            else if (strcmp(TempBuffer, "function") == 0) { // if function keyword exists
                 addToken(TknFunction, TempBuffer);
             }
             else if (strcmp(TempBuffer, "print") == 0) { // if print keyword exists
@@ -290,26 +344,7 @@ void tokenize(const char *code) {
             } 
             else if (strcmp(TempBuffer, "return") == 0) { // if return keyword exists
                 addToken(TknReturn, TempBuffer);
-            } else if (strcmp(TempBuffer, "arg") == 0) { // command line argument variable
-                pointer++;
-                if (isdigit(*pointer)) {
-                    int j = 0;
-                    char argBuffer[100] = {0};
-                    // Copy "arg"
-                    argBuffer[j++] = 'a';
-                    argBuffer[j++] = 'r';
-                    argBuffer[j++] = 'g';
-                    while (isdigit(*pointer)) {
-                        argBuffer[j++] = *pointer++;
-                    }
-                    addToken(TknIdentifier, argBuffer); // argument token
-                    argsCount++;
-                }
-                else {
-                    fprintf(stderr, "! Syntax Error: Invalid character after 'arg' characters in code. Any variable starting with 'arg' is a reserved name for accessing command line arguments \n");
-                    exit(1);
-                }
-            }
+            } 
             else if (isValidIdentifier(TempBuffer)) { // if valid identifier exists 
                 addToken(TknIdentifier, TempBuffer);
             } 
@@ -527,6 +562,12 @@ AstNode* pFactor() {
         factorNode -> data.factor.constant = atof(pCurrentTkn().value);
         pMoveToNextTkn();
     } 
+    else if (pCurrentTkn().type == TknArg) {
+        factorNode = createNode(nodeFactor);
+        factorNode -> data.factor.argfunc = strdup(pCurrentTkn().value);
+        printf("Stored identifier: %s\n", factorNode->data.factor.argfunc);
+        pMoveToNextTkn();
+    }
     else if (pCurrentTkn().type == TknIdentifier) {
         printf("Found identifier: %s\n", pCurrentTkn().value);
         // if function call
@@ -1164,7 +1205,17 @@ void toC(AstNode* node) {
             }
 
             // add main functions
-            addToCodeBuffer("int main(int argc, char *argv[]) {\n");
+             addToCodeBuffer("int main(int argc, char *argv[]) {\n");
+
+            char arglinebuffer[256]; // Adjust size as needed
+
+
+            // Check if there are any arguments to include
+            if (argsCount > 0) {
+                printf("Error: program cannot handle arguments :( \n");
+                exit(EXIT_FAILURE);
+            }
+            
             bool hasReturn = false; // flag to track if a return statement is made in main
 
             // Process all statements that should be executed in main
@@ -1317,6 +1368,22 @@ for (int j = 0; j < node->data.program.lineCount; j++) {
         case nodeFactor:
             if (node->data.factor.identifier) { // identifier exists
                 addToCodeBuffer(node->data.factor.identifier);
+            }
+            else if (node->data.factor.argfunc) {
+                // Assuming argfunc represents an argument variable (e.g., arg0, arg1, etc.)
+                const char *argFunc = node->data.factor.argfunc;
+
+            // Check if argFunc matches the pattern "argX" where X is a digit
+                if (strncmp(argFunc, "arg", 3) == 0) {
+                    int argIndex = atoi(argFunc + 3); // Get index from arg0, arg1, etc.
+                    addToCodeBuffer("argv[");
+                    char buffer[10];
+                    snprintf(buffer, sizeof(buffer), "%d", argIndex + 1); // Adjust for argv indexing
+                    addToCodeBuffer(buffer);
+                    addToCodeBuffer("]");
+                } else {
+                    addToCodeBuffer(argFunc); // Handle any other cases as necessary
+                }
             }
             else if (node->data.factor.funcCall) { // else if function call exists
                 toC(node->data.factor.funcCall);
@@ -1471,7 +1538,33 @@ void parseCommandLineArgs(int argc, char *argv[]) {
     }
 }
 
+// ###################### random argument bullshit
+
+// Function to check if a string can be converted to a float or an integer
+int isValidNumber(const char *str) {
+    char *endptr;
+    errno = 0; // Reset errno before strtof and strtol
+
+    // Check for float
+    float floatVal = strtof(str, &endptr);
+    if (errno == 0 && *endptr == '\0') {
+        return 1; // Valid float
+    }
+
+    // Reset errno for integer check
+    errno = 0;
+
+    // Check for integer
+    long intVal = strtol(str, &endptr, 10);
+    if (errno == 0 && *endptr == '\0' && intVal >= INT_MIN && intVal <= INT_MAX) {
+        return 1; // Valid integer
+    }
+
+    return 0; // Not a valid float or integer
+}
+
 // ######### FUCK THIS MAN ########
+
 
 
    int main(int argc, char *argv[]) {
@@ -1479,6 +1572,14 @@ void parseCommandLineArgs(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <filename.ml>\n", argv[0]); // changed to fprintf to print to stderr instead of default data stream
         return 1;
+    }
+
+        // Check all argv inputs from argv[2] onward
+    for (int i = 2; i < argc; i++) {
+        if (!isValidNumber(argv[i])) {
+            fprintf(stderr, "Error: Argument %d ('%s') is not a valid number.\n", i, argv[i]);
+            return 1;
+        }
     }
 
     //initalise buffer
@@ -1508,6 +1609,30 @@ void parseCommandLineArgs(int argc, char *argv[]) {
     for (int i = 0; i < TknIndex; i++) {
         print_token(Tokens[i]);
     }
+    
+    // Array to hold args starting from argv[2]
+    char *args[MAX_ARGS];
+
+    // Collect argv[2] onwards
+    for (int i = 2; i < argc && argsCount < MAX_ARGS; i++) {
+        args[argsCount++] = argv[i];
+    }
+
+    //consider arg0 type variables
+    // Array to hold unique arguments
+    int tokenCount = sizeof(Tokens) / sizeof(Tokens[0]);
+    int uniqueCount = 0;
+
+    UniqueArgs uniqueArgs;
+    collectUniqueArgs(Tokens, tokenCount, &uniqueArgs);
+
+    // check number of unique args and stuff matches
+    if (uniqueArgs.count != argc -2) {
+        fprintf(stderr, "! Error: Incorrect number of argument inputs for argument variables in file'\n");
+        return 1;
+    }
+    
+    
 
     // Parse the code and build the AST
     AstNode* result = pProgram(); 
