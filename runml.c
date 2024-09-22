@@ -1,3 +1,8 @@
+//  CITS2002 Project 1 2024
+//  Student1:   23630652   Zac Maslen
+//  Student2:   24000895   Alexandra Mennie
+//  Platform:   Linux  
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -1274,18 +1279,18 @@ int findAssi(const char* buffer, VarInf vars[], int* varCount) {
         return -1;
 }
     // tokenise each str
-    char* line = strtok(buffCpy, "\n");
+    char* tLine = strtok(buffCpy, "\n");
     // from there we add each line into the array and we keep track of how many lines stored
-    while (line) {
-        lines[lineCount++] = line;
-        line = strtok(NULL, "\n");
+    while (tLine) {
+        lines[lineCount++] = tLine;
+        tLine = strtok(NULL, "\n");
     }
 
-    for (int i = 0; i < lineCount; i++) {
-        char* pos = strstr(lines[i], "AssiType ");
-        if (pos && (strchr(pos, ';') != NULL)) {
+    for (int lineIter = 0; lineIter < lineCount; lineIter++) {
+        char* pl = strstr(lines[lineIter], "AssiType ");
+        if (pl && (strchr(pl, ';') != NULL)) {
             char* varName = malloc(13); // 12 letters + whitespace
-            sscanf(pos, "AssiType %12[^; ]", varName);
+            sscanf(pl, "AssiType %12[^; ]", varName);
             vars[*varCount].name = varName;
             vars[*varCount].operated = 0; 
             (*varCount)++;
